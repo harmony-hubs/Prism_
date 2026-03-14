@@ -1,4 +1,6 @@
+import React from 'react';
 import { initWaaP } from '@human.tech/waap-sdk';
+import { PassportScoreWidget, DarkTheme } from '@gitcoin/passport-scorer';
 import { IkaClient, getNetworkConfig } from '@ika.xyz/sdk';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
@@ -130,4 +132,19 @@ import { Transaction } from '@mysten/sui/transactions';
       // const result = await ikaClient.signAndExecuteTransaction({ transactionBlock: tx });
       // return result;
     }
+
+export const PassportWidget: React.FC<{ userAddress: string; signMessage: (message: string) => Promise<string> }> = ({ userAddress, signMessage }) => {
+  const PASSPORT_API_KEY = 'YOUR_PASSPORT_API_KEY'; // Replace with your API key
+  const PASSPORT_SCORER_ID = 'YOUR_PASSPORT_SCORER_ID'; // Replace with your scorer ID
+
+  return (
+    <PassportScoreWidget
+      apiKey={PASSPORT_API_KEY}
+      scorerId={PASSPORT_SCORER_ID}
+      address={userAddress}
+      generateSignatureCallback={signMessage}
+      theme={DarkTheme}
+    />
+  );
+};
     
