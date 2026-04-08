@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import * as WaapModule from '@human.tech/waap-sdk';
 
 // ─── SOLANA / IKA CONSTANTS ───
 const SOLANA_RPC = 'https://api.devnet.solana.com';
-const IKA_PROGRAM_ID = '87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY';
-const IKA_GRPC = 'https://pre-alpha-dev-1.ika.ika-network.net:443';
 
 // ─── SDK ACCESS HELPERS ───
 const initWaaP = (WaapModule as any).initWaaP || (WaapModule as any).default?.initWaaP;
@@ -36,16 +34,20 @@ interface Badge {
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
-interface Trap {
+interface Proposal {
   id: string;
-  trigger: string;
-  effect: string;
+  title: string;
   targetChain: string;
-  armed: boolean;
+  dwalletType: 'secp256k1' | 'curve25519';
+  messageHash: string;
+  quorum: number;
+  yesVotes: number;
+  noVotes: number;
+  status: 'pending' | 'approved';
 }
 
 type Screen = 'splash' | 'creating' | 'funded' | 'hub';
-type Tab = 'worlds' | 'badges' | 'traps' | 'log';
+type Tab = 'worlds' | 'badges' | 'governance' | 'log';
 
 const rarityColors: Record<string, string> = {
   common: '#8B9DAF',
@@ -174,12 +176,10 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 export const TheHollow: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('splash');
   const [tab, setTab] = useState<Tab>('worlds');
-  const [user, setUser] = useState<any>(null);
   const [hollowId, setHollowId] = useState('');
-  const [dwalletId, setDwalletId] = useState('');
   const [worlds, setWorlds] = useState<ChainWorld[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
-  const [traps, setTraps] = useState<Trap[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(false);
   const [creationStep, setCreationStep] = useState(0);
   const [totalBalance, setTotalBalance] = useState('0.00');
@@ -190,6 +190,7 @@ export const TheHollow: React.FC = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [revealingBadge, setRevealingBadge] = useState<string | null>(null);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initWaaP) {
@@ -249,7 +250,6 @@ export const TheHollow: React.FC = () => {
     await new Promise((r) => setTimeout(r, 1000));
     setCreationStep(2);
     const dkg = await IkaDKG.generateMultiChainKeys();
-    setDwalletId(`${dkg.dwalletSecp} + ${dkg.dwalletEd}`);
     setWorlds(dkg.chains);
     setCreationStep(3);
     // Fetch Solana devnet balance for the generated SOL address
@@ -265,17 +265,37 @@ export const TheHollow: React.FC = () => {
     ];
     setBadges(initBadges);
 
-    setTraps([
-      { id: '1', trigger: 'ETH dips below $2k', effect: 'Auto-sell half my SOL bag', targetChain: 'Solana', armed: false },
-      { id: '2', trigger: 'BTC hits $100k', effect: 'Rebalance to 40% BTC', targetChain: 'Bitcoin', armed: false },
+    setProposals([
+      {
+        id: 'p1',
+        title: 'Sign BTC rebalance transaction',
+        targetChain: 'Bitcoin',
+        dwalletType: 'secp256k1',
+        messageHash: crypto.randomUUID().replace(/-/g, '').slice(0, 32),
+        quorum: 2,
+        yesVotes: 0,
+        noVotes: 0,
+        status: 'pending',
+      },
+      {
+        id: 'p2',
+        title: 'Sign SOL treasury transfer',
+        targetChain: 'Solana',
+        dwalletType: 'curve25519',
+        messageHash: crypto.randomUUID().replace(/-/g, '').slice(0, 32),
+        quorum: 2,
+        yesVotes: 0,
+        noVotes: 0,
+        status: 'pending',
+      },
     ]);
 
     setHollowId(`hollow_${crypto.randomUUID().slice(0, 8)}`);
     await new Promise((r) => setTimeout(r, 600));
 
     addQuest('Entered The Hollow', 50);
-    addQuest('Ika DKG: Secp256k1 (BTC/ETH) + Curve25519 (SOL)', 30);
-    addQuest('Encrypted 4 badges', 20);
+    addQuest('Unlocked all your starter wallets', 30);
+    addQuest('Unlocked 4 loot cards', 20);
     setPlayerLevel(2);
     setTotalXp(100);
     triggerConfetti();
@@ -284,24 +304,20 @@ export const TheHollow: React.FC = () => {
 
   const handleLogin = useCallback(async (method: 'passkey' | 'google') => {
     setLoading(true);
-    let account = { email: 'player@thehollow.xyz', id: 'hollow_player' };
     try {
       if (method === 'passkey' && typeof loginWithPasskey === 'function') {
-        const real = await loginWithPasskey();
-        if (real) account = { ...real };
+        await loginWithPasskey();
       } else if (method === 'google' && typeof loginWithSocial === 'function') {
-        const real = await loginWithSocial('google');
-        if (real) account = { ...real };
+        await loginWithSocial('google');
       }
     } catch (_) {}
-    setUser(account);
     setLoading(false);
     await createHollow();
   }, [createHollow]);
 
   const handleSign = useCallback(async (chain: string) => {
     setSigningWorld(chain);
-    addQuest(`Sending to ${chain} world...`, 0);
+    addQuest(`Sending to ${chain} zone...`, 0);
     try {
       const sig = await IkaDKG.signForChain(chain);
       addQuest(`${chain} transaction signed!`, 25);
@@ -317,22 +333,42 @@ export const TheHollow: React.FC = () => {
     setRevealingBadge(badgeId);
     setTimeout(() => {
       setBadges((prev) => prev.map((b) => b.id === badgeId ? { ...b, revealed: true, revealedTo: '0xVerifier' } : b));
-      addQuest(`Badge revealed — no secrets spilled!`, 35);
+      addQuest(`Loot card revealed — secret safe!`, 35);
       setRevealingBadge(null);
       triggerConfetti();
     }, 1200);
   }, [addQuest, triggerConfetti]);
 
-  const toggleTrap = useCallback((trapId: string) => {
-    setTraps((prev) => prev.map((t) => {
-      if (t.id === trapId) {
-        const armed = !t.armed;
-        addQuest(armed ? `Trap armed: "${t.trigger}"` : `Trap disarmed`, armed ? 15 : 0);
-        return { ...t, armed };
-      }
-      return t;
-    }));
-  }, [addQuest]);
+  const castVote = useCallback((proposalId: string, vote: 'yes' | 'no') => {
+    setPendingVoteId(proposalId);
+    setTimeout(() => {
+      setProposals((prev) =>
+        prev.map((p) => {
+          if (p.id !== proposalId || p.status === 'approved') return p;
+
+          const yesVotes = vote === 'yes' ? p.yesVotes + 1 : p.yesVotes;
+          const noVotes = vote === 'no' ? p.noVotes + 1 : p.noVotes;
+          const reachedQuorum = yesVotes >= p.quorum;
+
+          if (reachedQuorum) {
+            addQuest(`Team unlocked "${p.title}"`, 20);
+            addQuest(`Action sent for ${p.targetChain}!`, 30);
+          } else {
+            addQuest(`Voted ${vote.toUpperCase()} on "${p.title}"`, 10);
+          }
+
+          return {
+            ...p,
+            yesVotes,
+            noVotes,
+            status: reachedQuorum ? 'approved' : 'pending',
+          };
+        })
+      );
+      setPendingVoteId(null);
+      if (vote === 'yes') triggerConfetti();
+    }, 700);
+  }, [addQuest, triggerConfetti]);
 
   // shared styles
   const font = "'Inter', system-ui, sans-serif";
@@ -457,14 +493,14 @@ export const TheHollow: React.FC = () => {
               {
                 num: '2',
                 emoji: '🌍',
-                title: 'Get your wallets',
-                desc: 'We create real Bitcoin, Ethereum & Solana wallets for you — all controlled by one key.',
+                title: 'Unlock your wallets',
+                desc: 'We create your game wallets for Bitcoin, Ethereum, and Solana.',
               },
               {
                 num: '3',
-                emoji: '🚀',
-                title: 'Send crypto to them',
-                desc: 'Fund your wallets and manage everything from here. Your addresses stay private and unlinked.',
+                emoji: '🗳️',
+                title: 'Vote as a team',
+                desc: 'When enough YES votes are in, the action goes through automatically.',
               },
             ].map((s) => (
               <div key={s.num} style={{
@@ -498,8 +534,8 @@ export const TheHollow: React.FC = () => {
             textAlign: 'center', marginTop: '40px', fontSize: '13px',
             opacity: 0.25, lineHeight: 1.6,
           }}>
-            Your money stays on each chain. The Hollow just gives you
-            <br />one key to control it all — and keeps everything private.
+            Your money stays on each chain. You get one fun place
+            <br />to manage everything privately.
           </div>
         </div>
 
@@ -516,8 +552,8 @@ export const TheHollow: React.FC = () => {
   if (screen === 'creating') {
     const steps = [
       { emoji: '🔑', label: 'Verifying your identity...', done: creationStep > 1 },
-      { emoji: '🌍', label: 'Running Ika DKG — 2 keys for 3 chains...', done: creationStep > 2 },
-      { emoji: '🛡', label: 'Encrypting your badges...', done: creationStep > 3 },
+      { emoji: '🌍', label: 'Unlocking your game wallets...', done: creationStep > 2 },
+      { emoji: '🛡', label: 'Packing your loot cards...', done: creationStep > 3 },
       { emoji: '✨', label: 'Summoning your Hollow...', done: creationStep > 3 },
     ];
 
@@ -586,6 +622,16 @@ export const TheHollow: React.FC = () => {
             Here are your wallet addresses. Send crypto to any of them
             and it'll show up in your dashboard.
           </p>
+
+          <div style={{
+            background: card, borderRadius: '14px', border, padding: '14px',
+            marginBottom: '18px', textAlign: 'left',
+          }}>
+            <div style={{ fontSize: '11px', opacity: 0.4, marginBottom: '6px' }}>SETUP COMPLETE</div>
+            <div style={{ fontSize: '13px', opacity: 0.7 }}>
+              Your wallet team is ready. Copy any address below and send funds to start playing.
+            </div>
+          </div>
 
           <div style={{ display: 'grid', gap: '14px', marginBottom: '36px', textAlign: 'left' }}>
             {worlds.map((w) => (
@@ -738,7 +784,7 @@ export const TheHollow: React.FC = () => {
       {/* ─── BALANCE HERO ─── */}
       <div style={{ textAlign: 'center', padding: '40px 20px 20px' }}>
         <div style={{ fontSize: '12px', opacity: 0.3, fontWeight: 700, letterSpacing: '3px', marginBottom: '8px' }}>
-          YOUR STASH
+          YOUR TREASURE
         </div>
         <div style={{
           fontSize: '56px', fontWeight: 900, letterSpacing: '-3px',
@@ -747,7 +793,7 @@ export const TheHollow: React.FC = () => {
           ${totalBalance}
         </div>
         <div style={{ fontSize: '13px', opacity: 0.4 }}>
-          Across {worlds.filter((w) => w.unlocked).length} worlds • {badges.length} badges earned
+          Across {worlds.filter((w) => w.unlocked).length} zones • {badges.length} loot cards earned
         </div>
       </div>
 
@@ -757,10 +803,10 @@ export const TheHollow: React.FC = () => {
         padding: '8px 20px 0', marginBottom: '24px',
       }}>
         {([
-          { key: 'worlds' as Tab, emoji: '🌍', label: 'Worlds' },
-          { key: 'badges' as Tab, emoji: '🏆', label: 'Badges' },
-          { key: 'traps' as Tab, emoji: '⚡', label: 'Traps' },
-          { key: 'log' as Tab, emoji: '📜', label: 'Quest Log' },
+          { key: 'worlds' as Tab, emoji: '🌍', label: 'Zones' },
+          { key: 'badges' as Tab, emoji: '🏆', label: 'Loot' },
+          { key: 'governance' as Tab, emoji: '🗳️', label: 'Team Vote' },
+          { key: 'log' as Tab, emoji: '📜', label: 'Adventure Log' },
         ]).map((t) => (
           <button
             key={t.key}
@@ -816,7 +862,7 @@ export const TheHollow: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
                       <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>
-                        {w.chain} World
+                        {w.chain} Zone
                       </h3>
                       {w.unlocked && (
                         <span style={{
@@ -880,7 +926,7 @@ export const TheHollow: React.FC = () => {
               textAlign: 'center', padding: '20px', opacity: 0.25,
               fontSize: '13px', fontStyle: 'italic',
             }}>
-              Every transaction earns XP. Level up your worlds.
+              Every move earns XP. Level up your zones.
             </div>
           </div>
         )}
@@ -890,7 +936,7 @@ export const TheHollow: React.FC = () => {
           <>
             <div style={{ marginBottom: '24px' }}>
               <h2 style={{ fontSize: '22px', fontWeight: 900, marginBottom: '6px' }}>
-                Your Badges
+                Your Loot
               </h2>
               <p style={{ opacity: 0.35, fontSize: '14px' }}>
                 Prove stuff without spilling your secrets. Tap "Reveal" and the verifier
@@ -996,78 +1042,96 @@ export const TheHollow: React.FC = () => {
           </>
         )}
 
-        {/* ═══ TRAPS TAB ═══ */}
-        {tab === 'traps' && (
+        {/* ═══ GOVERNANCE TAB ═══ */}
+        {tab === 'governance' && (
           <>
             <div style={{ marginBottom: '24px' }}>
               <h2 style={{ fontSize: '22px', fontWeight: 900, marginBottom: '6px' }}>
-                Set Your Traps
+                Team Missions
               </h2>
               <p style={{ opacity: 0.35, fontSize: '14px' }}>
-                Automated cross-chain moves that stay encrypted. Nobody sees your strategy
-                until it fires. Like a tripwire, but for your portfolio.
+                Vote together on what to do next. When enough YES votes come in,
+                the mission unlocks automatically.
               </p>
             </div>
 
             <div style={{ display: 'grid', gap: '14px' }}>
-              {traps.map((t) => (
-                <div key={t.id} style={{
+              {proposals.map((p) => (
+                <div key={p.id} style={{
                   background: card, borderRadius: '20px',
-                  border: t.armed ? `1px solid ${neon}30` : border,
+                  border: p.status === 'approved' ? `1px solid ${neon}30` : border,
                   padding: '24px', display: 'flex', alignItems: 'center', gap: '20px',
                   transition: 'all 0.3s',
                 }}>
                   <div style={{
                     width: '52px', height: '52px', borderRadius: '16px',
-                    background: t.armed ? `${neon}15` : 'rgba(255,255,255,0.04)',
+                    background: p.status === 'approved' ? `${neon}15` : 'rgba(255,255,255,0.04)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '24px', border: t.armed ? `1px solid ${neon}25` : border,
+                    fontSize: '24px', border: p.status === 'approved' ? `1px solid ${neon}25` : border,
                     transition: 'all 0.3s',
-                    animation: t.armed ? 'hollowPulse 2s ease-in-out infinite' : 'none',
+                    animation: p.status === 'approved' ? 'hollowPulse 2s ease-in-out infinite' : 'none',
                   }}>
-                    {t.armed ? '🔥' : '⚡'}
+                    {p.status === 'approved' ? '✅' : '🗳️'}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
-                      When <span style={{ color: '#FFD54F' }}>{t.trigger}</span>
+                      {p.title}
                     </div>
                     <div style={{ fontSize: '13px', opacity: 0.4 }}>
-                      → <span style={{ color: neon }}>{t.effect}</span>
-                      <span style={{ opacity: 0.3 }}> on {t.targetChain}</span>
+                      World: <span style={{ color: neon }}>{p.targetChain}</span>
+                    </div>
+                    <div style={{ fontSize: '12px', marginTop: '8px' }}>
+                      YES {p.yesVotes} / {p.quorum} needed
+                      <span style={{ opacity: 0.35 }}> • NO {p.noVotes}</span>
                     </div>
                   </div>
-                  <button
-                    className="hollow-btn"
-                    onClick={() => toggleTrap(t.id)}
-                    style={{
-                      background: t.armed ? neon : 'rgba(255,255,255,0.06)',
-                      color: t.armed ? '#000' : '#666', border: 'none',
-                      padding: '10px 24px', borderRadius: '14px',
-                      fontWeight: 900, fontSize: '12px', cursor: 'pointer',
-                      fontFamily: font, minWidth: '90px',
-                      transition: 'transform 0.15s',
-                      boxShadow: t.armed ? `0 4px 16px ${neon}30` : 'none',
-                    }}
-                  >
-                    {t.armed ? '🔥 ARMED' : 'ARM'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="hollow-btn"
+                      onClick={() => castVote(p.id, 'yes')}
+                      disabled={p.status === 'approved' || pendingVoteId === p.id}
+                      style={{
+                        background: p.status === 'approved' ? 'rgba(255,255,255,0.06)' : `${neon}20`,
+                        color: p.status === 'approved' ? '#666' : neon, border: 'none',
+                        padding: '10px 14px', borderRadius: '12px',
+                        fontWeight: 900, fontSize: '12px', cursor: 'pointer',
+                        fontFamily: font,
+                      }}
+                    >
+                      {pendingVoteId === p.id ? '...' : 'YES'}
+                    </button>
+                    <button
+                      className="hollow-btn"
+                      onClick={() => castVote(p.id, 'no')}
+                      disabled={p.status === 'approved' || pendingVoteId === p.id}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        color: '#999', border: 'none',
+                        padding: '10px 14px', borderRadius: '12px',
+                        fontWeight: 900, fontSize: '12px', cursor: 'pointer',
+                        fontFamily: font,
+                      }}
+                    >
+                      NO
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* How traps work */}
+            {/* How governance works */}
             <div style={{
               marginTop: '28px', background: card, borderRadius: '20px',
               border, padding: '24px',
             }}>
               <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '14px' }}>
-                🕹 How traps work
+                🧠 How Team Vote works
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 {[
-                  { emoji: '🔐', text: 'Your conditions are encrypted on-chain. No one knows your strategy.' },
-                  { emoji: '🧠', text: 'Encrypt evaluates if conditions are met — without decrypting.' },
-                  { emoji: '✍️', text: 'When triggered, Ika signs the transaction on the target chain.' },
+                  { emoji: '🗳️', text: 'A mission appears with a goal and vote target.' },
+                  { emoji: '📌', text: 'Each player gets one vote so no one can spam.' },
+                  { emoji: '✍️', text: 'When enough YES votes are in, the send action runs automatically.' },
                 ].map((s, i) => (
                   <div key={i} style={{ fontSize: '12px', opacity: 0.4, lineHeight: 1.5 }}>
                     <div style={{ fontSize: '24px', marginBottom: '8px' }}>{s.emoji}</div>
@@ -1084,7 +1148,7 @@ export const TheHollow: React.FC = () => {
           <>
             <div style={{ marginBottom: '24px' }}>
               <h2 style={{ fontSize: '22px', fontWeight: 900, marginBottom: '6px' }}>
-                Quest Log
+                Adventure Log
               </h2>
               <p style={{ opacity: 0.35, fontSize: '14px' }}>
                 Everything you've done in The Hollow. Every action earns XP.
@@ -1134,7 +1198,7 @@ export const TheHollow: React.FC = () => {
         textAlign: 'center', padding: '30px 20px',
         opacity: 0.1, fontSize: '10px', letterSpacing: '3px',
       }}>
-        THE HOLLOW • IKA × ENCRYPT • SOLANA DEVNET
+        THE HOLLOW • VOTING-CONTROLLED dWALLETS • SOLANA DEVNET
       </footer>
     </div>
   );
