@@ -1,40 +1,129 @@
-# HARMONY: Bridgeless & Encrypted Capital Markets
+# The Hollow — Private Cross-Chain Identity
 
-**The "UX-Maxxing" Self-Custody Solution for the Next Billion Users.**
+**One identity. Every chain. Nothing exposed.**
 
-Built for the **Colosseum Frontier 2026** using **Ika**, **Encrypt**, and **WaaP**.
-
-## 🚀 The Vision
-"Stop thinking privacy app. Start thinking better market primitive." 
-
-Harmony transforms multi-chain assets into a single, unified market primitive. By combining **sub-second Parallel MPC (Ika)** with **Encrypted Execution (Encrypt)** and **Social Onboarding (WaaP)**, we've built a self-custody experience that feels like Web2 but operates with the full security of Web3.
-
-## 🛠️ Core Primitives (How We Win)
-
-### 1. Bridgeless Asset Control (Powered by Ika)
-*   **No Bridges, No Wrapped Assets**: Control native Bitcoin, Ethereum, and Zcash directly from Solana/Sui.
-*   **Program-Controlled Signing**: Uses Ika's 2PC-MPC to sign transactions only when your on-chain logic (or private Encrypt logic) is satisfied.
-*   **DKG Integration**: Real-time Distributed Key Generation for every user upon login.
-
-### 2. Encrypted Execution (Powered by Encrypt)
-*   **Private Market State**: Keep sensitive data like balances, order books, and yield strategies private on-chain.
-*   **Conditional Decryption**: State is only decrypted/revealed when the user authenticates via Passkey/MFA.
-*   **Privacy-First UX**: A "Privacy Toggle" in the UI demonstrates the seamless transition between public and encrypted states.
-
-### 3. UX-Maxxing Onboarding (Powered by WaaP)
-*   **Passkeys & FaceID**: Non-custodial login that removes the seed phrase barrier.
-*   **Social & MFA**: Google/Apple login with integrated Multi-Factor Authentication for high-value "Pulses" (transactions).
-*   **Normie-to-Degen Pipeline**: A UI that scales from a simple "One-Tap" interface to a full "Degen Mode" with technical MPC insights.
-
-## 🏗️ Technical Architecture
-- `move/harmony_heart.move`: The **MarketVault** smart contract on Sui/Solana. Handles vault authority, message approval, and encrypted state storage.
-- `src/app.tsx`: The **UX-Maxxed Dashboard**. Integrates the Ika SDK for signing, Encrypt for privacy, and WaaP for onboarding.
-
-## 🏃 How to Run
-1.  **Install Dependencies**: `npm install`
-2.  **Configure IDs**: Update `PACKAGE_ID` and `WaaP Project ID` in `src/app.tsx`.
-3.  **Launch**: `npm start`
+Built for **Colosseum Frontier 2026** using **Ika** (2PC-MPC dWallets) and **Encrypt** (private execution).
 
 ---
-**"One Login. Every Chain. Total Privacy. Zero Friction."**
-    
+
+## The Problem
+
+Today, if you hold assets on Bitcoin, Ethereum, and Solana, your on-chain identity is fragmented and fully public. Anyone can correlate your addresses, see your balances, and front-run your strategies. There is no way to prove "I have collateral" without revealing *which* chains and *how much* on each.
+
+## The Solution
+
+**The Hollow** is the first **private, unified cross-chain identity**. It combines two primitives that have never been used together:
+
+| Primitive | What It Does | How The Hollow Uses It |
+|---|---|---|
+| **Ika** | One MPC key controls native BTC, ETH, and SOL addresses (no bridges, no wrapping) | A single Hollow identity can sign transactions on any chain from one place |
+| **Encrypt** | Encrypted on-chain state with private execution | The link between your addresses is never public. Credentials are selectively disclosable |
+
+## Core Features
+
+### 1. Universal Identity via Ika DKG
+- User enters The Hollow via FaceID or Google login (WaaP)
+- Ika's Distributed Key Generation produces a single dWallet that controls **native addresses on BTC, ETH, and SOL**
+- The user can sign transactions on **any chain** from one dashboard
+
+### 2. Encrypted Credential Vault via Encrypt
+- Cross-chain balances, wallet age, reputation, and chain activity are aggregated and **encrypted on-chain**
+- The link between BTC/ETH/SOL addresses is **never public**
+- Only the Hollow owner can decrypt or selectively disclose
+
+### 3. Selective Disclosure (The "Wow" Factor)
+A DeFi protocol asks: *"Does this user have collateral?"*
+
+The Hollow proves **"Yes, I hold > $10k"** WITHOUT revealing which chains or addresses hold it. This is a zero-knowledge-style proof powered by Encrypt's private execution.
+
+**Unlocks**: undercollateralized cross-chain lending, private DAO membership, anonymous trading reputation.
+
+### 4. Encrypted Cross-Chain Automations
+- Set encrypted conditions: *"If ETH drops below $2k, sell my SOL position"*
+- The Hollow evaluates conditions **privately** and signs via Ika when triggered
+- No one sees your strategy until it executes
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────┐
+│                    The Hollow                       │
+│                                                     │
+│  ┌─────────────┐    ┌─────────────────────────┐    │
+│  │  WaaP SDK   │    │      Encrypt Layer       │    │
+│  │  (FaceID /  │    │  ┌───────────────────┐   │    │
+│  │   Google)   │    │  │ Encrypted Creds   │   │    │
+│  └──────┬──────┘    │  │ • Balance Proofs  │   │    │
+│         │           │  │ • Chain Activity  │   │    │
+│         ▼           │  │ • Reputation      │   │    │
+│  ┌─────────────┐    │  └───────────────────┘   │    │
+│  │  Hollow     │    │  ┌───────────────────┐   │    │
+│  │  Identity   │◄──►│  │ Selective         │   │    │
+│  │  (Sui Move) │    │  │ Disclosure Engine │   │    │
+│  └──────┬──────┘    │  └───────────────────┘   │    │
+│         │           └─────────────────────────┘    │
+│         ▼                                           │
+│  ┌─────────────────────────────────────────┐       │
+│  │            Ika dWallet (2PC-MPC)         │       │
+│  │                                          │       │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │       │
+│  │  │ Bitcoin  │ │Ethereum │ │ Solana  │   │       │
+│  │  │ (native)│ │(native) │ │(native) │   │       │
+│  │  └─────────┘ └─────────┘ └─────────┘   │       │
+│  └─────────────────────────────────────────┘       │
+└────────────────────────────────────────────────────┘
+```
+
+## Project Structure
+
+| File | Purpose |
+|---|---|
+| `move/hollow.move` | Sui Move contract — `HollowIdentity` struct, `create_hollow()`, `add_credential()`, `selective_disclose()`, `approve_action()` |
+| `move/Move.toml` | Move package config for `TheHollow` |
+| `src/app.tsx` | React dashboard — Hollow creation flow, chain overview, Prove panel (selective disclosure), Automate panel (encrypted conditions) |
+| `src/main.tsx` | App entry point |
+| `index.html` | Vite HTML shell |
+| `vite.config.ts` | Vite + React config |
+| `package.json` | Dependencies: `@ika.xyz/sdk`, `@human.tech/waap-sdk`, `@mysten/sui`, React |
+
+## How to Run
+
+```bash
+npm install
+npm start
+```
+
+The app opens at `http://localhost:5173`. Click **"Enter with FaceID"** to see the full flow:
+
+1. **Authentication** via WaaP Passkey/Google
+2. **Ika DKG** generates native BTC, ETH, and SOL addresses from one MPC key
+3. **Encrypt** creates encrypted credentials (balance proofs, chain activity, reputation)
+4. **Dashboard** shows your Hollow identity with all controlled chains
+5. **Prove panel** lets you selectively disclose a credential to a verifier
+6. **Automate panel** lets you set encrypted cross-chain conditions
+
+## Smart Contract API
+
+### `create_hollow(dwallet_id, dwallet_pubkey, encrypted_chain_addresses)`
+Mints a new HollowIdentity linked to an Ika dWallet. Emits `HollowCreated`.
+
+### `add_credential(hollow, credential_type, encrypted_value)`
+Encrypts and stores a credential on the Hollow. Emits `CredentialAdded`.
+
+### `selective_disclose(hollow, credential_index, verifier)`
+Reveals a specific credential to a verifier without exposing other data. Emits `SelectiveDisclosure`.
+
+### `approve_action(hollow, target_chain, message_hash)`
+Triggers Ika 2PC-MPC signing when encrypted conditions are met. Emits `CrossChainActionApproved`.
+
+## What Makes This Win
+
+- **Novel**: First project to combine private identity + multi-chain MPC signing
+- **Uses Both Primitives**: Ika for bridgeless control, Encrypt for private credentials
+- **Real Use Case**: Cross-chain reputation unlocks undercollateralized lending, private DAO membership, anonymous trading
+- **UX-Maxxed**: One FaceID tap to create an identity that works on every chain
+- **Demo-Ready**: User enters The Hollow, proves a cross-chain balance, and signs a BTC transaction from Solana — all without revealing their addresses
+
+---
+
+*The Hollow — an identity shell that reveals nothing until you decide otherwise.*
