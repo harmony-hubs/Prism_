@@ -1,0 +1,15 @@
+[package]
+name = "hollow-voting"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ika-dwallet-pinocchio = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
+pinocchio = "0.10"
+pinocchio-system = "0.5"
+
+[dev-dependencies]
+solana-sdk = "2"
+
+[lib]
+crate-type = ["cdylib", "lib"]

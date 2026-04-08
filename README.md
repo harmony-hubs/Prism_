@@ -2,13 +2,13 @@
 
 **One identity. Every chain. Nothing exposed.**
 
-Built for **Colosseum Frontier 2026** using **Ika** (2PC-MPC dWallets) and **Encrypt** (private execution).
+Built for **Colosseum Frontier 2026** using **Ika** (2PC-MPC dWallets on Solana) and **Encrypt** (private execution).
 
 ---
 
 ## The Problem
 
-Today, if you hold assets on Bitcoin, Ethereum, and Solana, your on-chain identity is fragmented and fully public. Anyone can correlate your addresses, see your balances, and front-run your strategies. There is no way to prove "I have collateral" without revealing *which* chains and *how much* on each.
+If you hold assets on Bitcoin, Ethereum, and Solana, your on-chain identity is fragmented and fully public. Anyone can correlate your addresses, see your balances, and front-run your strategies. There is no way to prove "I have collateral" without revealing *which* chains and *how much* on each.
 
 ## The Solution
 
@@ -16,112 +16,150 @@ Today, if you hold assets on Bitcoin, Ethereum, and Solana, your on-chain identi
 
 | Primitive | What It Does | How The Hollow Uses It |
 |---|---|---|
-| **Ika** | One MPC key controls native BTC, ETH, and SOL addresses (no bridges, no wrapping) | A single Hollow identity can sign transactions on any chain from one place |
+| **Ika** | One MPC key controls native BTC, ETH, and SOL addresses — no bridges, no wrapping | A single Hollow identity signs transactions on any chain from one place |
 | **Encrypt** | Encrypted on-chain state with private execution | The link between your addresses is never public. Credentials are selectively disclosable |
-
-## Core Features
-
-### 1. Universal Identity via Ika DKG
-- User enters The Hollow via FaceID or Google login (WaaP)
-- Ika's Distributed Key Generation produces a single dWallet that controls **native addresses on BTC, ETH, and SOL**
-- The user can sign transactions on **any chain** from one dashboard
-
-### 2. Encrypted Credential Vault via Encrypt
-- Cross-chain balances, wallet age, reputation, and chain activity are aggregated and **encrypted on-chain**
-- The link between BTC/ETH/SOL addresses is **never public**
-- Only the Hollow owner can decrypt or selectively disclose
-
-### 3. Selective Disclosure (The "Wow" Factor)
-A DeFi protocol asks: *"Does this user have collateral?"*
-
-The Hollow proves **"Yes, I hold > $10k"** WITHOUT revealing which chains or addresses hold it. This is a zero-knowledge-style proof powered by Encrypt's private execution.
-
-**Unlocks**: undercollateralized cross-chain lending, private DAO membership, anonymous trading reputation.
-
-### 4. Encrypted Cross-Chain Automations
-- Set encrypted conditions: *"If ETH drops below $2k, sell my SOL position"*
-- The Hollow evaluates conditions **privately** and signs via Ika when triggered
-- No one sees your strategy until it executes
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────┐
-│                    The Hollow                       │
-│                                                     │
-│  ┌─────────────┐    ┌─────────────────────────┐    │
-│  │  WaaP SDK   │    │      Encrypt Layer       │    │
-│  │  (FaceID /  │    │  ┌───────────────────┐   │    │
-│  │   Google)   │    │  │ Encrypted Creds   │   │    │
-│  └──────┬──────┘    │  │ • Balance Proofs  │   │    │
-│         │           │  │ • Chain Activity  │   │    │
-│         ▼           │  │ • Reputation      │   │    │
-│  ┌─────────────┐    │  └───────────────────┘   │    │
-│  │  Hollow     │    │  ┌───────────────────┐   │    │
-│  │  Identity   │◄──►│  │ Selective         │   │    │
-│  │  (Sui Move) │    │  │ Disclosure Engine │   │    │
-│  └──────┬──────┘    │  └───────────────────┘   │    │
-│         │           └─────────────────────────┘    │
-│         ▼                                           │
-│  ┌─────────────────────────────────────────┐       │
-│  │            Ika dWallet (2PC-MPC)         │       │
-│  │                                          │       │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │       │
-│  │  │ Bitcoin  │ │Ethereum │ │ Solana  │   │       │
-│  │  │ (native)│ │(native) │ │(native) │   │       │
-│  │  └─────────┘ └─────────┘ └─────────┘   │       │
-│  └─────────────────────────────────────────┘       │
-└────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│                     The Hollow                         │
+│                                                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │   Frontend    │  │   Solana     │  │  Rust CLI    │ │
+│  │   (React)     │  │   Program    │  │  (gRPC)      │ │
+│  │              │  │  (Pinocchio) │  │              │ │
+│  │  Login via   │  │              │  │  Create      │ │
+│  │  WaaP/FaceID │  │  init_hollow │  │  dWallets    │ │
+│  │  View worlds │  │  approve_act │  │  via Ika     │ │
+│  │  Prove badges│  │  transfer    │  │  DKG         │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘ │
+│         │                 │                  │         │
+│         └────────────┬────┴──────────────────┘         │
+│                      ▼                                  │
+│         ┌─────────────────────────────┐                │
+│         │    Ika dWallet (2PC-MPC)     │                │
+│         │    Program: 87W54k...q1oY    │                │
+│         │                              │                │
+│         │  ┌────────┐ ┌────────┐ ┌────────┐           │
+│         │  │Bitcoin │ │Ethereum│ │Solana  │           │
+│         │  │(native)│ │(native)│ │(native)│           │
+│         │  └────────┘ └────────┘ └────────┘           │
+│         └─────────────────────────────┘                │
+│                                                        │
+│         ┌─────────────────────────────┐                │
+│         │       Encrypt Layer          │                │
+│         │  Encrypted credentials       │                │
+│         │  Selective disclosure         │                │
+│         │  Private condition evaluation │                │
+│         └─────────────────────────────┘                │
+└───────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure
 
-| File | Purpose |
+```
+The_Hollow/
+├── program/                    # Solana on-chain program (Rust/Pinocchio)
+│   ├── Cargo.toml
+│   └── src/lib.rs              # init_hollow, approve_action, transfer_authority
+├── client/                     # Off-chain CLI client (Rust/gRPC)
+│   ├── Cargo.toml
+│   └── src/main.rs             # Create dWallets, sign messages, check status
+├── move/                       # Reference contract (Sui Move — vision artifact)
+│   ├── hollow.move
+│   └── Move.toml
+├── src/                        # Frontend (React/Vite)
+│   ├── app.tsx                 # Gamified dashboard with Worlds, Badges, Traps
+│   └── main.tsx                # Entry point
+├── Cargo.toml                  # Rust workspace
+├── index.html
+├── package.json
+├── vite.config.ts
+└── README.md
+```
+
+## Solana Program (`program/src/lib.rs`)
+
+Built with Pinocchio + `ika-dwallet-pinocchio` for CPI into the Ika dWallet program.
+
+| Instruction | What It Does |
 |---|---|
-| `move/hollow.move` | Sui Move contract — `HollowIdentity` struct, `create_hollow()`, `add_credential()`, `selective_disclose()`, `approve_action()` |
-| `move/Move.toml` | Move package config for `TheHollow` |
-| `src/app.tsx` | React dashboard — Hollow creation flow, chain overview, Prove panel (selective disclosure), Automate panel (encrypted conditions) |
-| `src/main.tsx` | App entry point |
-| `index.html` | Vite HTML shell |
-| `vite.config.ts` | Vite + React config |
-| `package.json` | Dependencies: `@ika.xyz/sdk`, `@human.tech/waap-sdk`, `@mysten/sui`, React |
+| `init_hollow` | Transfers dWallet authority to The Hollow's CPI PDA, making it the sole signer |
+| `approve_action` | Approves a cross-chain message for Ika MPC signing — creates a MessageApproval PDA |
+| `transfer_authority` | Transfers dWallet ownership (recovery, DAO handoff) |
+
+**How signing works:**
+1. Your program calls `approve_message` via CPI → creates a MessageApproval PDA (status = Pending)
+2. The Ika network detects the MessageApproval account
+3. The NOA (Network Operated Authority) signs using 2PC-MPC
+4. The signature is written on-chain (status = Signed)
+5. Anyone can read the signature from the MessageApproval account
+
+## CLI Client (`client/src/main.rs`)
+
+```bash
+# Create a Hollow identity (dWallet via Ika DKG)
+cargo run -- create --keypair ~/.config/solana/id.json
+
+# Approve a cross-chain message for signing
+cargo run -- sign --keypair ~/.config/solana/id.json \
+  --dwallet <DWALLET_ADDRESS> \
+  --message <HEX_HASH> \
+  --scheme ed25519
+
+# Check if the signature is ready
+cargo run -- status --approval <APPROVAL_ADDRESS>
+```
+
+## Frontend (`src/app.tsx`)
+
+Gamified UI that hides all the crypto complexity:
+
+| Tab | What It Does | Under The Hood |
+|---|---|---|
+| **Worlds** | BTC/ETH/SOL shown as game worlds with XP | Ika dWallet controls native addresses |
+| **Badges** | Encrypted credentials with rarity tiers | Encrypt stores data, proofs on reveal |
+| **Traps** | IF/THEN automations you arm/disarm | Encrypted conditions, Ika signs on trigger |
+| **Quest Log** | Activity feed with +XP rewards | Every action logged |
+
+## Pre-Alpha Environment
+
+| Resource | Endpoint |
+|---|---|
+| dWallet gRPC | `https://pre-alpha-dev-1.ika.ika-network.net:443` |
+| Solana RPC | `https://api.devnet.solana.com` |
+| Ika Program ID | `87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY` |
 
 ## How to Run
 
+### Frontend
 ```bash
 npm install
 npm start
 ```
 
-The app opens at `http://localhost:5173`. Click **"Enter with FaceID"** to see the full flow:
+### Solana Program (requires Rust + Solana CLI)
+```bash
+# Build the program
+cargo build-sbf --manifest-path program/Cargo.toml
 
-1. **Authentication** via WaaP Passkey/Google
-2. **Ika DKG** generates native BTC, ETH, and SOL addresses from one MPC key
-3. **Encrypt** creates encrypted credentials (balance proofs, chain activity, reputation)
-4. **Dashboard** shows your Hollow identity with all controlled chains
-5. **Prove panel** lets you selectively disclose a credential to a verifier
-6. **Automate panel** lets you set encrypted cross-chain conditions
+# Deploy to devnet
+solana program deploy target/deploy/the_hollow.so --url devnet
+```
 
-## Smart Contract API
-
-### `create_hollow(dwallet_id, dwallet_pubkey, encrypted_chain_addresses)`
-Mints a new HollowIdentity linked to an Ika dWallet. Emits `HollowCreated`.
-
-### `add_credential(hollow, credential_type, encrypted_value)`
-Encrypts and stores a credential on the Hollow. Emits `CredentialAdded`.
-
-### `selective_disclose(hollow, credential_index, verifier)`
-Reveals a specific credential to a verifier without exposing other data. Emits `SelectiveDisclosure`.
-
-### `approve_action(hollow, target_chain, message_hash)`
-Triggers Ika 2PC-MPC signing when encrypted conditions are met. Emits `CrossChainActionApproved`.
+### CLI Client
+```bash
+cargo run --manifest-path client/Cargo.toml -- create --keypair ~/.config/solana/id.json
+```
 
 ## What Makes This Win
 
-- **Novel**: First project to combine private identity + multi-chain MPC signing
-- **Uses Both Primitives**: Ika for bridgeless control, Encrypt for private credentials
+- **Novel**: First project combining private identity + multi-chain MPC signing on Solana
+- **Uses Both Primitives**: Ika for bridgeless dWallet control, Encrypt for private credentials
+- **Real Ika Integration**: Solana program with CPI into the Ika dWallet pre-alpha
 - **Real Use Case**: Cross-chain reputation unlocks undercollateralized lending, private DAO membership, anonymous trading
-- **UX-Maxxed**: One FaceID tap to create an identity that works on every chain
+- **UX-Maxxed**: Gamified UI — normies see Worlds, Badges, and Traps instead of chains, credentials, and automations
 - **Demo-Ready**: User enters The Hollow, proves a cross-chain balance, and signs a BTC transaction from Solana — all without revealing their addresses
 
 ---

@@ -1,7 +1,7 @@
 {
-  "name": "harmony-heart-beats",
+  "name": "the-hollow",
   "version": "1.0.0",
-  "description": "Spreading harmony across blockchains",
+  "description": "Private cross-chain identity — powered by Ika + Encrypt on Solana",
   "main": "src/app.tsx",
   "scripts": {
     "start": "vite",
@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@human.tech/waap-sdk": "latest",
-    "@ika.xyz/sdk": "latest",
-    "@mysten/sui": "latest",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "react": "^19.2.4",

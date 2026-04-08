@@ -1,0 +1,13 @@
+[package]
+name = "hollow-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ika-grpc = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
+ika-dwallet-types = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+solana-sdk = "2"
+solana-client = "2"
+clap = { version = "4", features = ["derive"] }
+bs58 = "0.5"

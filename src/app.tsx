@@ -1,20 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as WaapModule from '@human.tech/waap-sdk';
-import { IkaClient, getNetworkConfig } from '@ika.xyz/sdk';
-import * as SuiClientModule from '@mysten/sui/client';
+
+// ─── SOLANA / IKA CONSTANTS ───
+const SOLANA_RPC = 'https://api.devnet.solana.com';
+const IKA_PROGRAM_ID = '87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY';
+const IKA_GRPC = 'https://pre-alpha-dev-1.ika.ika-network.net:443';
 
 // ─── SDK ACCESS HELPERS ───
 const initWaaP = (WaapModule as any).initWaaP || (WaapModule as any).default?.initWaaP;
 const loginWithPasskey = (WaapModule as any).loginWithPasskey || (WaapModule as any).default?.loginWithPasskey;
 const loginWithSocial = (WaapModule as any).loginWithSocial || (WaapModule as any).default?.loginWithSocial;
-const SuiClient = (SuiClientModule as any).SuiClient || (SuiClientModule as any).default?.SuiClient || (SuiClientModule as any).default;
-
-let suiClient: any;
-const initSuiClient = () => {
-  if (!suiClient && SuiClient) {
-    suiClient = new SuiClient({ url: 'https://fullnode.mainnet.sui.io:443' });
-  }
-};
 
 // ─── TYPES ───
 interface ChainWorld {
@@ -60,14 +55,21 @@ const rarityColors: Record<string, string> = {
 };
 
 // ─── SIMULATED IKA DKG ───
+// Ika DKG simulation — 2 dWallets per Hollow:
+//   dWallet #1: Secp256k1 (curve 0) → Bitcoin + Ethereum
+//   dWallet #2: Curve25519 (curve 2) → Solana
 const IkaDKG = {
   generateMultiChainKeys: async (): Promise<{
-    dwalletId: string;
+    dwalletSecp: string;
+    dwalletEd: string;
     chains: ChainWorld[];
   }> => {
     await new Promise((r) => setTimeout(r, 2000));
+    const dwalletSecp = `dwallet_secp_${crypto.randomUUID().slice(0, 10)}`;
+    const dwalletEd = `dwallet_ed25519_${crypto.randomUUID().slice(0, 10)}`;
     return {
-      dwalletId: `dwallet_${crypto.randomUUID().slice(0, 12)}`,
+      dwalletSecp,
+      dwalletEd,
       chains: [
         {
           chain: 'Bitcoin',
@@ -109,6 +111,9 @@ const IkaDKG = {
     };
   },
   signForChain: async (chain: string): Promise<string> => {
+    // In production: sends approve_action to Solana program,
+    // which CPI's into Ika dWallet program's approve_message.
+    // Secp256k1 dWallet signs for BTC/ETH, Curve25519 for SOL.
     await new Promise((r) => setTimeout(r, 1500));
     return `sig_${chain.toLowerCase()}_${crypto.randomUUID().slice(0, 16)}`;
   },
@@ -219,26 +224,23 @@ export const TheHollow: React.FC = () => {
   }, []);
 
   const fetchBalances = useCallback(async (address: string, chainList: ChainWorld[]) => {
-    initSuiClient();
-    let suiBalance = 0;
-    const suiPrice = 1.72;
+    let solBalance = 0;
+    const solPrice = 135.0;
     try {
-      for (const node of ['https://sui-mainnet.nodeinfra.com', 'https://fullnode.mainnet.sui.io:443']) {
-        try {
-          const res = await fetch(node, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'suix_getBalance', params: [address, '0x2::sui::SUI'] }),
-          });
-          const data = await res.json();
-          if (data.result?.totalBalance) { suiBalance = parseInt(data.result.totalBalance) / 1e9; break; }
-        } catch (_) {}
+      const res = await fetch(SOLANA_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [address] }),
+      });
+      const data = await res.json();
+      if (data.result?.value !== undefined) {
+        solBalance = data.result.value / 1e9;
       }
     } catch (_) {}
-    const totalUsd = suiBalance * suiPrice;
+    const totalUsd = solBalance * solPrice;
     setTotalBalance(totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    setWorlds(chainList.map((c) => c.chain === 'Solana' ? { ...c, balance: suiBalance.toFixed(4), usdValue: totalUsd.toFixed(2), address, xp: Math.floor(suiBalance * 10) } : c));
-    return { suiBalance, totalUsd };
+    setWorlds(chainList.map((c) => c.chain === 'Solana' ? { ...c, balance: solBalance.toFixed(4), usdValue: totalUsd.toFixed(2), address, xp: Math.floor(solBalance * 10) } : c));
+    return { solBalance, totalUsd };
   }, []);
 
   const createHollow = useCallback(async () => {
@@ -247,11 +249,12 @@ export const TheHollow: React.FC = () => {
     await new Promise((r) => setTimeout(r, 1000));
     setCreationStep(2);
     const dkg = await IkaDKG.generateMultiChainKeys();
-    setDwalletId(dkg.dwalletId);
+    setDwalletId(`${dkg.dwalletSecp} + ${dkg.dwalletEd}`);
     setWorlds(dkg.chains);
     setCreationStep(3);
-    const testAddr = '0xf4984f69d6da291f3bd5573e95487e5c59f9041710590a0b57210a2798c03d3d';
-    await fetchBalances(testAddr, dkg.chains);
+    // Fetch Solana devnet balance for the generated SOL address
+    const solWorld = dkg.chains.find((c) => c.chain === 'Solana');
+    await fetchBalances(solWorld?.address || '', dkg.chains);
     setCreationStep(4);
 
     const initBadges: Badge[] = [
@@ -271,7 +274,7 @@ export const TheHollow: React.FC = () => {
     await new Promise((r) => setTimeout(r, 600));
 
     addQuest('Entered The Hollow', 50);
-    addQuest('Unlocked 3 worlds via Ika', 30);
+    addQuest('Ika DKG: Secp256k1 (BTC/ETH) + Curve25519 (SOL)', 30);
     addQuest('Encrypted 4 badges', 20);
     setPlayerLevel(2);
     setTotalXp(100);
@@ -281,15 +284,14 @@ export const TheHollow: React.FC = () => {
 
   const handleLogin = useCallback(async (method: 'passkey' | 'google') => {
     setLoading(true);
-    const testAddr = '0xf4984f69d6da291f3bd5573e95487e5c59f9041710590a0b57210a2798c03d3d';
-    let account = { email: 'player@thehollow.xyz', id: 'hollow_player', address: testAddr };
+    let account = { email: 'player@thehollow.xyz', id: 'hollow_player' };
     try {
       if (method === 'passkey' && typeof loginWithPasskey === 'function') {
         const real = await loginWithPasskey();
-        if (real) account = { ...real, address: testAddr };
+        if (real) account = { ...real };
       } else if (method === 'google' && typeof loginWithSocial === 'function') {
         const real = await loginWithSocial('google');
-        if (real) account = { ...real, address: testAddr };
+        if (real) account = { ...real };
       }
     } catch (_) {}
     setUser(account);
@@ -514,7 +516,7 @@ export const TheHollow: React.FC = () => {
   if (screen === 'creating') {
     const steps = [
       { emoji: '🔑', label: 'Verifying your identity...', done: creationStep > 1 },
-      { emoji: '🌍', label: 'Unlocking Bitcoin, Ethereum & Solana worlds...', done: creationStep > 2 },
+      { emoji: '🌍', label: 'Running Ika DKG — 2 keys for 3 chains...', done: creationStep > 2 },
       { emoji: '🛡', label: 'Encrypting your badges...', done: creationStep > 3 },
       { emoji: '✨', label: 'Summoning your Hollow...', done: creationStep > 3 },
     ];
@@ -1132,7 +1134,7 @@ export const TheHollow: React.FC = () => {
         textAlign: 'center', padding: '30px 20px',
         opacity: 0.1, fontSize: '10px', letterSpacing: '3px',
       }}>
-        THE HOLLOW • IKA × ENCRYPT
+        THE HOLLOW • IKA × ENCRYPT • SOLANA DEVNET
       </footer>
     </div>
   );
