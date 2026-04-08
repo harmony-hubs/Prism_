@@ -49,7 +49,7 @@ interface Trap {
   armed: boolean;
 }
 
-type Screen = 'splash' | 'creating' | 'hub';
+type Screen = 'splash' | 'creating' | 'funded' | 'hub';
 type Tab = 'worlds' | 'badges' | 'traps' | 'log';
 
 const rarityColors: Record<string, string> = {
@@ -184,6 +184,7 @@ export const TheHollow: React.FC = () => {
   const [questLog, setQuestLog] = useState<{ text: string; xp: number; time: string }[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [revealingBadge, setRevealingBadge] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   useEffect(() => {
     if (initWaaP) {
@@ -275,7 +276,7 @@ export const TheHollow: React.FC = () => {
     setPlayerLevel(2);
     setTotalXp(100);
     triggerConfetti();
-    setScreen('hub');
+    setScreen('funded');
   }, [addQuest, fetchBalances, triggerConfetti]);
 
   const handleLogin = useCallback(async (method: 'passkey' | 'google') => {
@@ -346,9 +347,9 @@ export const TheHollow: React.FC = () => {
   if (screen === 'splash') {
     return (
       <div style={{
-        background: `radial-gradient(ellipse at 50% 80%, #1a0a2e 0%, ${bg} 60%)`,
-        height: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
+        background: `radial-gradient(ellipse at 50% 30%, #1a0a2e 0%, ${bg} 60%)`,
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center',
         color: 'white', fontFamily: font, overflow: 'hidden', position: 'relative',
       }}>
         {/* Floating particles */}
@@ -364,8 +365,8 @@ export const TheHollow: React.FC = () => {
           }} />
         ))}
 
-        <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          {/* Big hollow ring */}
+        {/* Hero section */}
+        <div style={{ textAlign: 'center', position: 'relative', zIndex: 1, paddingTop: '12vh' }}>
           <div style={{
             width: '120px', height: '120px', borderRadius: '50%',
             border: `3px solid ${neon}50`,
@@ -390,7 +391,7 @@ export const TheHollow: React.FC = () => {
             THE HOLLOW
           </h1>
           <p style={{
-            opacity: 0.5, marginBottom: '48px', fontSize: '16px', lineHeight: 1.6,
+            opacity: 0.5, fontSize: '16px', lineHeight: 1.6,
             maxWidth: '340px', margin: '0 auto 48px',
           }}>
             Your secret identity across every blockchain.
@@ -428,11 +429,81 @@ export const TheHollow: React.FC = () => {
           >
             Continue with Google
           </button>
-
-          <p style={{ marginTop: '48px', fontSize: '10px', opacity: 0.15, letterSpacing: '4px' }}>
-            POWERED BY IKA + ENCRYPT
-          </p>
         </div>
+
+        {/* How it works */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          maxWidth: '700px', width: '100%', padding: '80px 20px 60px',
+          margin: '0 auto',
+        }}>
+          <h2 style={{
+            textAlign: 'center', fontSize: '13px', fontWeight: 900,
+            letterSpacing: '3px', opacity: 0.3, marginBottom: '36px',
+          }}>
+            HOW IT WORKS
+          </h2>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+            {[
+              {
+                num: '1',
+                emoji: '👆',
+                title: 'Log in once',
+                desc: 'Use your face, fingerprint, or Google. No seed phrases, no extensions, no headaches.',
+              },
+              {
+                num: '2',
+                emoji: '🌍',
+                title: 'Get your wallets',
+                desc: 'We create real Bitcoin, Ethereum & Solana wallets for you — all controlled by one key.',
+              },
+              {
+                num: '3',
+                emoji: '🚀',
+                title: 'Send crypto to them',
+                desc: 'Fund your wallets and manage everything from here. Your addresses stay private and unlinked.',
+              },
+            ].map((s) => (
+              <div key={s.num} style={{
+                background: card, borderRadius: '20px', border,
+                padding: '28px 24px', textAlign: 'center',
+              }}>
+                <div style={{
+                  fontSize: '32px', marginBottom: '14px',
+                  animation: 'hollowFloat 3s ease-in-out infinite',
+                  animationDelay: `${parseInt(s.num) * 0.3}s`,
+                }}>
+                  {s.emoji}
+                </div>
+                <div style={{
+                  fontSize: '10px', fontWeight: 900, color: neon,
+                  letterSpacing: '2px', marginBottom: '8px',
+                }}>
+                  STEP {s.num}
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 8px' }}>
+                  {s.title}
+                </h3>
+                <p style={{ fontSize: '12px', opacity: 0.4, lineHeight: 1.5, margin: 0 }}>
+                  {s.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{
+            textAlign: 'center', marginTop: '40px', fontSize: '13px',
+            opacity: 0.25, lineHeight: 1.6,
+          }}>
+            Your money stays on each chain. The Hollow just gives you
+            <br />one key to control it all — and keeps everything private.
+          </div>
+        </div>
+
+        <p style={{ paddingBottom: '40px', fontSize: '10px', opacity: 0.1, letterSpacing: '4px', zIndex: 1 }}>
+          POWERED BY IKA + ENCRYPT
+        </p>
       </div>
     );
   }
@@ -482,6 +553,113 @@ export const TheHollow: React.FC = () => {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // FUND YOUR WALLETS SCREEN
+  // ═══════════════════════════════════════════
+  if (screen === 'funded') {
+    const copyAddress = (address: string) => {
+      navigator.clipboard.writeText(address).then(() => {
+        setCopiedAddress(address);
+        setTimeout(() => setCopiedAddress(null), 2000);
+      });
+    };
+
+    return (
+      <div style={{
+        background: bg, minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: font,
+        padding: '40px 20px',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '500px', width: '100%' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+          <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '8px' }}>
+            Your Hollow is ready!
+          </h2>
+          <p style={{ opacity: 0.4, fontSize: '14px', lineHeight: 1.6, marginBottom: '36px' }}>
+            Here are your wallet addresses. Send crypto to any of them
+            and it'll show up in your dashboard.
+          </p>
+
+          <div style={{ display: 'grid', gap: '14px', marginBottom: '36px', textAlign: 'left' }}>
+            {worlds.map((w) => (
+              <div key={w.chain} style={{
+                background: card, borderRadius: '18px', border,
+                padding: '20px', position: 'relative', overflow: 'hidden',
+              }}>
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
+                  background: `linear-gradient(90deg, ${w.color}, transparent)`,
+                }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '22px' }}>{w.emoji}</span>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '15px' }}>{w.chain}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.3 }}>
+                      Send {w.symbol} to this address
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  background: 'rgba(255,255,255,0.04)', borderRadius: '12px',
+                  padding: '12px 14px', border: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div style={{
+                    flex: 1, fontSize: '11px', fontFamily: mono,
+                    opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {w.address}
+                  </div>
+                  <button
+                    onClick={() => copyAddress(w.address)}
+                    style={{
+                      background: copiedAddress === w.address ? `${neon}20` : 'rgba(255,255,255,0.08)',
+                      border: copiedAddress === w.address ? `1px solid ${neon}40` : '1px solid rgba(255,255,255,0.1)',
+                      color: copiedAddress === w.address ? neon : '#999',
+                      padding: '6px 14px', borderRadius: '8px',
+                      cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+                      fontFamily: font, whiteSpace: 'nowrap',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {copiedAddress === w.address ? '✅ Copied!' : '📋 Copy'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            className="hollow-btn"
+            onClick={() => setScreen('hub')}
+            style={{
+              width: '100%', padding: '18px', borderRadius: '18px',
+              background: `linear-gradient(135deg, ${neon}, #00CC82)`,
+              color: '#000', border: 'none', fontWeight: 900, fontSize: '16px',
+              cursor: 'pointer', fontFamily: font,
+              transition: 'transform 0.15s',
+              boxShadow: `0 8px 30px ${neon}30`,
+              marginBottom: '12px',
+            }}
+          >
+            🎮 Enter The Hollow
+          </button>
+          <button
+            onClick={() => setScreen('hub')}
+            style={{
+              background: 'none', border: 'none', color: '#555',
+              cursor: 'pointer', fontSize: '13px', fontFamily: font,
+              padding: '10px',
+            }}
+          >
+            I'll do this later →
+          </button>
         </div>
       </div>
     );
