@@ -1,17 +1,14 @@
 #![no_std]
 extern crate alloc;
 
-use ika_dwallet_pinocchio::DWalletContext;
-use pinocchio::{
-    account_info::AccountInfo, entrypoint, msg, program_error::ProgramError, pubkey::Pubkey,
-    ProgramResult,
-};
+use ika_dwallet_pinocchio::{CPI_AUTHORITY_SEED, DWalletContext};
+use pinocchio::{entrypoint, error::ProgramError, AccountView, Address, ProgramResult};
 
 entrypoint!(process_instruction);
 pinocchio::nostd_panic_handler!();
 
-// Demo program id placeholder. Replace for real deployment.
-pub const ID: Pubkey = Pubkey::new_from_array([9u8; 32]);
+/// Your deployed voting program id (`Address::from_str_const` after deploy). Distinct from the Ika dWallet program.
+pub const ID: Address = Address::new_from_array([9u8; 32]);
 
 const CREATE_PROPOSAL: u8 = 0;
 const CAST_VOTE: u8 = 1;
@@ -54,15 +51,14 @@ fn write_u64_le(dst: &mut [u8], value: u64) {
 }
 
 fn build_ctx<'a>(
-    program_id: &Pubkey,
-    dwallet_program: &'a AccountInfo,
-    cpi_authority: &'a AccountInfo,
-    caller_program: &'a AccountInfo,
+    program_id: &Address,
+    dwallet_program: &'a AccountView,
+    cpi_authority: &'a AccountView,
+    caller_program: &'a AccountView,
 ) -> Result<(DWalletContext<'a>, u8), ProgramError> {
-    let (expected_cpi, bump) =
-        Pubkey::find_program_address(&[b"__ika_cpi_authority"], program_id);
-    if *cpi_authority.key() != expected_cpi {
-        msg!("CPI authority PDA mismatch");
+    let (expected_cpi, bump) = Address::derive_program_address(&[CPI_AUTHORITY_SEED], program_id)
+        .ok_or(ProgramError::InvalidAccountData)?;
+    if *cpi_authority.address() != expected_cpi {
         return Err(ProgramError::InvalidAccountData);
     }
     Ok((
@@ -77,8 +73,8 @@ fn build_ctx<'a>(
 }
 
 pub fn process_instruction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &[AccountView],
     instruction_data: &[u8],
 ) -> ProgramResult {
     if instruction_data.is_empty() {
@@ -104,8 +100,8 @@ pub fn process_instruction(
 /// [33]    signature_scheme (0 ed25519, 1 secp256k1, 2 secp256r1)
 /// [34]    approved_bump (message approval PDA bump)
 fn create_proposal(
-    _program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    _program_id: &Address,
+    accounts: &[AccountView],
     data: &[u8],
 ) -> ProgramResult {
     if accounts.len() < 3 {
@@ -136,14 +132,14 @@ fn create_proposal(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    let mut proposal_data = proposal.try_borrow_mut_data()?;
+    let mut proposal_data = proposal.try_borrow_mut()?;
     if proposal_data.len() < PROPOSAL_LEN {
         return Err(ProgramError::AccountDataTooSmall);
     }
 
     // Initialize proposal
-    proposal_data[0..32].copy_from_slice(creator.key().as_ref());
-    proposal_data[32..64].copy_from_slice(dwallet.key().as_ref());
+    proposal_data[0..32].copy_from_slice(creator.address().as_ref());
+    proposal_data[32..64].copy_from_slice(dwallet.address().as_ref());
     proposal_data[64..96].copy_from_slice(message_hash);
     write_u64_le(&mut proposal_data[96..104], 0);
     write_u64_le(&mut proposal_data[104..112], 0);
@@ -152,7 +148,6 @@ fn create_proposal(
     proposal_data[114] = STATUS_PENDING;
     proposal_data[115] = approved_bump;
 
-    msg!("Proposal created");
     Ok(())
 }
 
@@ -174,8 +169,8 @@ fn create_proposal(
 /// [0] vote_value (0 no, 1 yes)
 /// [1..33] user_pubkey (target chain pubkey bytes)
 fn cast_vote(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &[AccountView],
     data: &[u8],
 ) -> ProgramResult {
     if accounts.len() < 10 {
@@ -204,26 +199,23 @@ fn cast_vote(
     if vote_value != VOTE_NO && vote_value != VOTE_YES {
         return Err(ProgramError::InvalidInstructionData);
     }
-    let user_pubkey = &data[1..33];
-
     // Prevent double voting by checking vote record initialization
     {
-        let mut vr_data = vote_record.try_borrow_mut_data()?;
+        let mut vr_data = vote_record.try_borrow_mut()?;
         if vr_data.len() < VOTE_RECORD_LEN {
             return Err(ProgramError::AccountDataTooSmall);
         }
         let already_voted = vr_data[0..32].iter().any(|b| *b != 0);
         if already_voted {
-            msg!("Voter already voted");
             return Err(ProgramError::AccountAlreadyInitialized);
         }
-        vr_data[0..32].copy_from_slice(voter.key().as_ref());
+        vr_data[0..32].copy_from_slice(voter.address().as_ref());
         vr_data[32] = vote_value;
     }
 
     let (ctx, _) = build_ctx(program_id, dwallet_program, cpi_authority, caller_program)?;
 
-    let mut proposal_data = proposal.try_borrow_mut_data()?;
+    let mut proposal_data = proposal.try_borrow_mut()?;
     if proposal_data.len() < PROPOSAL_LEN {
         return Err(ProgramError::AccountDataTooSmall);
     }
@@ -236,7 +228,6 @@ fn cast_vote(
     let approved_bump = proposal_data[115];
 
     if status == STATUS_APPROVED {
-        msg!("Proposal already approved");
         return Err(ProgramError::InvalidAccountData);
     }
 
@@ -248,25 +239,24 @@ fn cast_vote(
     write_u64_le(&mut proposal_data[96..104], yes_votes);
     write_u64_le(&mut proposal_data[104..112], no_votes);
 
-    msg!("Vote recorded");
-
     if yes_votes >= quorum {
         let mut message_hash = [0u8; 32];
         message_hash.copy_from_slice(&proposal_data[64..96]);
+        let mut user_pubkey = [0u8; 32];
+        user_pubkey.copy_from_slice(&data[1..33]);
 
         ctx.approve_message(
             message_approval,
             dwallet,
             payer,
             system_program,
-            &message_hash,
+            message_hash,
             user_pubkey,
             signature_scheme,
             approved_bump,
         )?;
 
         proposal_data[114] = STATUS_APPROVED;
-        msg!("Quorum reached: proposal approved and message sent to Ika");
     }
 
     Ok(())

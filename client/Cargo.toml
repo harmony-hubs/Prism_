@@ -11,3 +11,5 @@ solana-sdk = "2"
 solana-client = "2"
 clap = { version = "4", features = ["derive"] }
 bs58 = "0.5"
+# Windows: `solana-sdk` pulls OpenSSL (`solana-secp256r1-program`). Install OpenSSL (e.g. https://slproweb.com/products/Win32OpenSSL.html)
+# and set `OPENSSL_DIR`, or build in WSL/Linux. (`openssl` crate feature `vendored` needs Perl on Windows.)

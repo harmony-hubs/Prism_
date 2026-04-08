@@ -1,19 +1,14 @@
 #![no_std]
 extern crate alloc;
 
-use pinocchio::{
-    account_info::AccountInfo, entrypoint, msg, program_error::ProgramError, pubkey::Pubkey,
-    ProgramResult,
-};
-use ika_dwallet_pinocchio::DWalletContext;
+use ika_dwallet_pinocchio::{CPI_AUTHORITY_SEED, DWalletContext};
+use pinocchio::{entrypoint, error::ProgramError, AccountView, Address, ProgramResult};
 
 entrypoint!(process_instruction);
 pinocchio::nostd_panic_handler!();
 
-/// The Hollow program ID (replace with actual deployed address)
-pub const ID: Pubkey = five_eight_const::decode_32_const(
-    "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY",
-);
+/// Deployed **The Hollow** program id. After `solana program deploy`, set this to match (see Ika quick-start `Address::from_str_const`).
+pub const ID: Address = Address::new_from_array([0u8; 32]);
 
 // ─── Instruction discriminators ───
 const INIT_HOLLOW: u8 = 0;
@@ -36,10 +31,11 @@ const CURVE_RISTRETTO: u8 = 3;  // Substrate (future)
 // ─── Ika signature schemes ───
 const SIG_ED25519: u8 = 0;      // Solana, Sui
 const SIG_SECP256K1: u8 = 1;    // Bitcoin, Ethereum
+const SIG_SECP256R1: u8 = 2;    // WebAuthn / P-256 (Ika docs)
 
 pub fn process_instruction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &[AccountView],
     instruction_data: &[u8],
 ) -> ProgramResult {
     if instruction_data.is_empty() {
@@ -56,16 +52,15 @@ pub fn process_instruction(
 
 /// Build the DWalletContext from a standard set of accounts.
 fn build_ctx<'a>(
-    program_id: &Pubkey,
-    dwallet_program: &'a AccountInfo,
-    cpi_authority: &'a AccountInfo,
-    caller_program: &'a AccountInfo,
-) -> Result<(DWalletContext<'a>, Pubkey, u8), ProgramError> {
-    let (expected_cpi, bump) =
-        Pubkey::find_program_address(&[b"__ika_cpi_authority"], program_id);
+    program_id: &Address,
+    dwallet_program: &'a AccountView,
+    cpi_authority: &'a AccountView,
+    caller_program: &'a AccountView,
+) -> Result<(DWalletContext<'a>, Address, u8), ProgramError> {
+    let (expected_cpi, bump) = Address::derive_program_address(&[CPI_AUTHORITY_SEED], program_id)
+        .ok_or(ProgramError::InvalidAccountData)?;
 
-    if *cpi_authority.key() != expected_cpi {
-        msg!("CPI authority PDA mismatch");
+    if *cpi_authority.address() != expected_cpi {
         return Err(ProgramError::InvalidAccountData);
     }
 
@@ -97,8 +92,8 @@ fn build_ctx<'a>(
 ///   4. []         cpi_authority      - this program's CPI authority PDA
 ///   5. []         caller_program     - this program's executable account
 fn init_hollow(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &[AccountView],
     _data: &[u8],
 ) -> ProgramResult {
     if accounts.len() < 6 {
@@ -121,14 +116,11 @@ fn init_hollow(
     )?;
 
     // Transfer authority for the Secp256k1 dWallet (Bitcoin + Ethereum)
-    ctx.transfer_dwallet(dwallet_secp, expected_cpi.as_ref())?;
-    msg!("Secp256k1 dWallet (BTC/ETH) authority transferred");
+    ctx.transfer_dwallet(dwallet_secp, expected_cpi.to_bytes())?;
 
     // Transfer authority for the Curve25519 dWallet (Solana)
-    ctx.transfer_dwallet(dwallet_ed, expected_cpi.as_ref())?;
-    msg!("Curve25519 dWallet (SOL) authority transferred");
+    ctx.transfer_dwallet(dwallet_ed, expected_cpi.to_bytes())?;
 
-    msg!("Hollow identity initialized — 2 dWallets, 3 chains");
     Ok(())
 }
 
@@ -155,13 +147,13 @@ fn init_hollow(
 ///   7. []         caller_program
 ///
 /// Data layout:
-///   [0..32]  message_hash      - 32-byte hash of the message to sign
+///   [0..32]  message_hash      - keccak256(message) per Ika MessageApproval docs
 ///   [32..64] user_pubkey       - 32-byte public key for the target chain
-///   [64]     signature_scheme  - 0=Ed25519 (SOL), 1=Secp256k1 (BTC/ETH)
+///   [64]     signature_scheme  - 0=Ed25519, 1=Secp256k1, 2=Secp256r1 (Ika)
 ///   [65]     bump              - MessageApproval PDA bump
 fn approve_action(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &[AccountView],
     data: &[u8],
 ) -> ProgramResult {
     if accounts.len() < 8 {
@@ -197,24 +189,22 @@ fn approve_action(
     let signature_scheme = data[64];
     let bump = data[65];
 
-    let chain_label = match signature_scheme {
-        SIG_ED25519 => "SOL (Ed25519)",
-        SIG_SECP256K1 => "BTC/ETH (Secp256k1)",
-        _ => "unknown chain",
-    };
+    match signature_scheme {
+        SIG_ED25519 | SIG_SECP256K1 | SIG_SECP256R1 => {}
+        _ => return Err(ProgramError::InvalidInstructionData),
+    }
 
     ctx.approve_message(
         message_approval,
         dwallet,
         payer,
         system_program,
-        &message_hash,
-        &user_pubkey,
+        message_hash,
+        user_pubkey,
         signature_scheme,
         bump,
     )?;
 
-    msg!("Action approved for {} — awaiting Ika 2PC-MPC signature", chain_label);
     Ok(())
 }
 
@@ -232,8 +222,8 @@ fn approve_action(
 /// Data:
 ///   [0..32] new_authority pubkey
 fn transfer_authority(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &[AccountView],
     data: &[u8],
 ) -> ProgramResult {
     if accounts.len() < 5 {
@@ -257,8 +247,9 @@ fn transfer_authority(
         program_id, dwallet_program, cpi_authority, caller_program,
     )?;
 
-    ctx.transfer_dwallet(dwallet, &data[0..32])?;
+    let mut new_authority = [0u8; 32];
+    new_authority.copy_from_slice(&data[0..32]);
+    ctx.transfer_dwallet(dwallet, new_authority)?;
 
-    msg!("dWallet authority transferred");
     Ok(())
 }

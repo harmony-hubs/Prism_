@@ -63,6 +63,9 @@ The_Hollow/
 ├── program/                    # Solana on-chain program (Rust/Pinocchio)
 │   ├── Cargo.toml
 │   └── src/lib.rs              # init_hollow, approve_action, transfer_authority
+├── voting/                     # Voting-controlled dWallet (create_proposal, cast_vote)
+│   ├── Cargo.toml
+│   └── src/lib.rs
 ├── client/                     # Off-chain CLI client (Rust/gRPC)
 │   ├── Cargo.toml
 │   └── src/main.rs             # Create dWallets, sign messages, check status
@@ -120,7 +123,7 @@ Gamified UI that hides all the crypto complexity:
 |---|---|---|
 | **Worlds** | BTC/ETH/SOL shown as game worlds with XP | Ika dWallet controls native addresses |
 | **Badges** | Encrypted credentials with rarity tiers | Encrypt stores data, proofs on reveal |
-| **Traps** | IF/THEN automations you arm/disarm | Encrypted conditions, Ika signs on trigger |
+| **Team Vote** | Squad missions / proposals | Quorum → CPI `approve_message` on the dWallet |
 | **Quest Log** | Activity feed with +XP rewards | Every action logged |
 
 ## Pre-Alpha Environment
@@ -129,7 +132,26 @@ Gamified UI that hides all the crypto complexity:
 |---|---|
 | dWallet gRPC | `https://pre-alpha-dev-1.ika.ika-network.net:443` |
 | Solana RPC | `https://api.devnet.solana.com` |
-| Ika Program ID | `87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY` |
+| **Ika dWallet program** (devnet) | `87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY` |
+
+That last id is the **Ika dWallet program** (MessageApproval PDAs, `approve_message` CPI target). Your **own** Pinocchio program gets its own id when you `solana program deploy`. The CPI authority PDA is always `find_program_address(["__ika_cpi_authority"], YOUR_PROGRAM_ID)` — see Ika [CPI framework](https://github.com/dwallet-labs/ika-pre-alpha/blob/main/docs/src/on-chain/cpi-framework.md).
+
+## Ika documentation checklist (this repo)
+
+Aligned with the [ika-pre-alpha](https://github.com/dwallet-labs/ika-pre-alpha) docs:
+
+| Topic | Where in this repo |
+|--------|---------------------|
+| Pinocchio deps + `crate-type` | `program/Cargo.toml`, `voting/Cargo.toml` |
+| `DWalletContext` + `CPI_AUTHORITY_SEED` | `program/src/lib.rs`, `voting/src/lib.rs` |
+| `approve_message` / `transfer_dwallet` data & schemes (0/1/2) | `approve_action`, `cast_vote` |
+| MessageApproval offsets (139 / 140 / 142) | `client/src/main.rs` |
+| **Message hash** | Must be **keccak256** of the raw message (Ika `message-approval.md`) — enforced off-chain when you build txs |
+| gRPC + `ika-dwallet-types` (off-chain) | `client/Cargo.toml` — wire `ika-grpc` calls where marked `TODO` |
+| SBF static syscalls | `solana-define-syscall` in program `Cargo.toml` under `target_os = "solana"` / `target_arch = "bpf"` |
+| Voting example (full layout) | Ika `docs/src/examples/voting/` — our `voting/` crate is a slimmer variant; CPI rules match |
+
+CLI: set **`HOLLOW_PROGRAM_ID`** (or `--hollow-program`) to **your** deployed program id when deriving the CPI PDA — **not** `87W54k...`.
 
 ## How to Run
 
@@ -139,17 +161,40 @@ npm install
 npm start
 ```
 
-### Solana Program (requires Rust + Solana CLI)
-```bash
-# Build the program
-cargo build-sbf --manifest-path program/Cargo.toml
+### Solana programs (Rust + `cargo-build-sbf`)
 
-# Deploy to devnet
+Host check (no Solana CLI required):
+
+```bash
+cargo check -p the-hollow -p hollow-voting
+```
+
+**On-chain (SBF) build** needs the [Agave release](https://github.com/anza-xyz/agave/releases) (includes `cargo-build-sbf`) or a full Solana/Agave install with `cargo-build-sbf` on your `PATH`.
+
+**Windows:** the first build downloads *platform-tools* into your user cache. That step creates **symlinks**. If you see error **1314** (“required privilege…”):
+
+- Turn on **Developer Mode**: Settings → System → **For developers** → **Developer Mode**, then run the build again, **or**
+- Run the terminal **as Administrator** once so the toolchain can install.
+
+From the repo root (PowerShell), after extracting a Windows release to `tools/solana-release/` *or* putting `cargo-build-sbf` on `PATH`:
+
+```powershell
+.\scripts\build-sbf.ps1 -Target all
+# or one crate:
+.\scripts\build-sbf.ps1 -Target program -Verbose
+```
+
+Deploy to devnet (artifact path is printed by the build; name is usually `the_hollow` / `hollow_voting` with underscores):
+
+```bash
 solana program deploy target/deploy/the_hollow.so --url devnet
 ```
 
 ### CLI Client
 ```bash
+# Set your deployed Hollow program id (CPI PDA derivation — see Ika docs)
+export HOLLOW_PROGRAM_ID=<your_deployed_program_pubkey>
+
 cargo run --manifest-path client/Cargo.toml -- create --keypair ~/.config/solana/id.json
 ```
 
@@ -159,7 +204,7 @@ cargo run --manifest-path client/Cargo.toml -- create --keypair ~/.config/solana
 - **Uses Both Primitives**: Ika for bridgeless dWallet control, Encrypt for private credentials
 - **Real Ika Integration**: Solana program with CPI into the Ika dWallet pre-alpha
 - **Real Use Case**: Cross-chain reputation unlocks undercollateralized lending, private DAO membership, anonymous trading
-- **UX-Maxxed**: Gamified UI — normies see Worlds, Badges, and Traps instead of chains, credentials, and automations
+- **UX-Maxxed**: Gamified UI — normies see zones, loot, and team votes instead of chains, credentials, and governance
 - **Demo-Ready**: User enters The Hollow, proves a cross-chain balance, and signs a BTC transaction from Solana — all without revealing their addresses
 
 ---

@@ -8,7 +8,12 @@ use std::str::FromStr;
 
 const DWALLET_GRPC: &str = "https://pre-alpha-dev-1.ika.ika-network.net:443";
 const SOLANA_RPC: &str = "https://api.devnet.solana.com";
-const IKA_PROGRAM_ID: &str = "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY";
+
+/// Ika **dWallet** program on devnet (pre-alpha). Used for dWallet / MessageApproval PDAs — not for your CPI authority PDA.
+const IKA_DWALLET_PROGRAM_ID: &str = "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY";
+
+/// Must match `ika_dwallet_pinocchio::CPI_AUTHORITY_SEED` (Ika `cpi-framework.md`).
+const CPI_AUTHORITY_SEED: &[u8] = b"__ika_cpi_authority";
 
 /// dWallet account layout offsets
 const DWALLET_AUTHORITY_OFFSET: usize = 0;
@@ -25,6 +30,9 @@ const APPROVAL_SIG_OFFSET: usize = 142;
 #[command(name = "hollow")]
 #[command(about = "The Hollow — manage your private cross-chain identity")]
 struct Cli {
+    /// Your deployed **The Hollow** (or custom controller) program id. Derives the CPI PDA with seed `__ika_cpi_authority` (see Ika docs). This is **not** the Ika dWallet program id (`87W54k...`).
+    #[arg(long, global = true, env = "HOLLOW_PROGRAM_ID")]
+    hollow_program: Option<String>,
     #[command(subcommand)]
     command: Commands,
 }
@@ -76,19 +84,25 @@ fn curve_name(id: u8) -> &'static str {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let rpc = RpcClient::new_with_commitment(SOLANA_RPC.to_string(), CommitmentConfig::confirmed());
-    let program_id = Pubkey::from_str(IKA_PROGRAM_ID)?;
-
     match cli.command {
-        Commands::Create { keypair } => {
+        Commands::Create { keypair: _ } => {
             println!("╔══════════════════════════════════════╗");
             println!("║   The Hollow — Create Identity       ║");
             println!("╚══════════════════════════════════════╝\n");
 
-            // Derive CPI authority PDA
-            let (cpi_authority, bump) = Pubkey::find_program_address(
-                &[b"__ika_cpi_authority"],
-                &program_id,
-            );
+            let ika_dwallet_program = Pubkey::from_str(IKA_DWALLET_PROGRAM_ID)?;
+            let hollow_pid = match &cli.hollow_program {
+                Some(s) => Pubkey::from_str(s)?,
+                None => {
+                    eprintln!("Set --hollow-program or HOLLOW_PROGRAM_ID to your deployed program id.");
+                    eprintln!("CPI authority PDA = find_program_address([\"__ika_cpi_authority\"], YOUR_PROGRAM_ID).");
+                    eprintln!("Ika dWallet program (separate): {ika_dwallet_program}");
+                    return Ok(());
+                }
+            };
+
+            let (cpi_authority, bump) =
+                Pubkey::find_program_address(&[CPI_AUTHORITY_SEED], &hollow_pid);
 
             println!("1. Connecting to Ika gRPC at {DWALLET_GRPC}");
             println!("2. Creating dWallet #1 — Secp256k1 (Bitcoin + Ethereum)...");
@@ -110,6 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("   ✓ Curve25519 dWallet created (mock)");
 
             println!("4. Transferring both dWallets to Hollow CPI PDA...");
+            println!("   Your program:    {hollow_pid}");
+            println!("   Ika dWallet pg:  {ika_dwallet_program} (for CPI account list)");
             println!("   CPI Authority: {cpi_authority} (bump: {bump})");
 
             // TODO: Send init_hollow transaction transferring both dWallets
@@ -143,7 +159,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!("Sending approve_action instruction...");
             println!("  → Creates MessageApproval PDA on-chain");
-            println!("  → Seeds: [\"message_approval\", dwallet_pubkey, message_hash]");
+            println!("  → Seeds: [\"message_approval\", dwallet_pubkey, message_hash] (program: Ika dWallet)");
+            println!("  → message_hash must be keccak256(raw_message) per Ika message-approval docs");
 
             // TODO: Build and send the actual approve_action transaction
 
@@ -219,15 +236,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("Public Key: {} ({pubkey_len} bytes)", bs58::encode(pubkey_bytes).into_string());
                         println!("Imported:   {}", if data.len() > DWALLET_CURVE_OFFSET + 1 { data[DWALLET_CURVE_OFFSET + 1] != 0 } else { false });
 
-                        // Check if controlled by The Hollow
-                        let (cpi_pda, _) = Pubkey::find_program_address(
-                            &[b"__ika_cpi_authority"],
-                            &program_id,
-                        );
-                        if authority == cpi_pda {
-                            println!("\n🔒 Controlled by The Hollow (CPI PDA match)");
+                        if let Some(ref hp) = cli.hollow_program {
+                            let hollow_pid = Pubkey::from_str(hp)?;
+                            let (cpi_pda, _) =
+                                Pubkey::find_program_address(&[CPI_AUTHORITY_SEED], &hollow_pid);
+                            if authority == cpi_pda {
+                                println!("\n🔒 Authority matches CPI PDA for --hollow-program {hollow_pid}");
+                            } else {
+                                println!("\n⚠️  Authority does not match CPI PDA for that program id");
+                            }
                         } else {
-                            println!("\n⚠️  NOT controlled by The Hollow (authority mismatch)");
+                            println!("\n💡 Pass --hollow-program to compare authority to Ika CPI PDA");
                         }
                     } else {
                         println!("Account data too small — may not be a dWallet");

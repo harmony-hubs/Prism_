@@ -7,9 +7,16 @@ edition = "2024"
 ika-dwallet-pinocchio = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
 pinocchio = "0.10"
 pinocchio-system = "0.5"
+solana-address = { version = "2.6", default-features = false, features = ["sha2", "curve25519"] }
 
 [dev-dependencies]
 solana-sdk = "2"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[lints.rust]
+unexpected_cfgs = "allow"
+
+[target.'cfg(any(target_os = "solana", target_arch = "bpf"))'.dependencies]
+solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }

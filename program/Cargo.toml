@@ -7,6 +7,16 @@ edition = "2024"
 ika-dwallet-pinocchio = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
 pinocchio = "0.10"
 pinocchio-system = "0.5"
+# Host `cargo check`: `Address::derive_program_address` / PDA checks (pinocchio’s `solana-address` is `syscalls`-only).
+# `sha2`: PDA derivation. `curve25519`: `is_on_curve` off-chain (needed for `derive_program_address` / `cargo check` on Windows).
+solana-address = { version = "2.6", default-features = false, features = ["sha2", "curve25519"] }
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[lints.rust]
+unexpected_cfgs = "allow"
+
+# Pinocchio: enable static syscalls when building for SBF (see ika `frameworks/pinocchio.md` / pinocchio crate docs).
+[target.'cfg(any(target_os = "solana", target_arch = "bpf"))'.dependencies]
+solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }
