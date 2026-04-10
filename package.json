@@ -1,21 +1,28 @@
 {
   "name": "the-hollow",
   "version": "1.0.0",
-  "description": "Private cross-chain identity — powered by Ika + Encrypt on Solana",
+  "description": "PRISM — minimal multi-chain wallet experience (practice mode)",
   "main": "src/app.tsx",
   "scripts": {
+    "dev": "vite",
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@human.tech/waap-sdk": "latest",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
+    "three": "^0.183.2"
   },
   "devDependencies": {
+    "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "latest",
     "vite": "latest"
   }
