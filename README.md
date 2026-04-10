@@ -4,6 +4,10 @@
 
 Built for **Colosseum Frontier 2026** using **Ika** (2PC-MPC dWallets on Solana) and **Encrypt** (private execution).
 
+### Canonical dWallet steps (Solana pre-alpha)
+
+Follow the official book: **[dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/)** · [Introduction](https://solana-pre-alpha.ika.xyz/introduction.html) · [Single-page / print](https://solana-pre-alpha.ika.xyz/print.html). High level: **create dWallet → CPI authority to your program → `approve_message` → signature in MessageApproval** (see the book for prerequisites, Pinocchio/Anchor, gRPC, and testing). Product overview: [ika.xyz](https://ika.xyz/). The PRISM app includes a **dWallet** tab that mirrors this checklist and pre-alpha endpoints, plus an **Operator console**: keccak256 + MessageApproval PDA preview, dWallet inspect, and MessageApproval polling (same account layout as `client/src/main.rs`). **Phantom** in the header swaps the demo SOL row to your real devnet pubkey and balance. Copy `.env.example` to `.env` and set `VITE_HOLLOW_PROGRAM_ID` after you deploy `program/`.
+
 ---
 
 ## The Problem

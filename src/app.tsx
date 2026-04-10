@@ -1,8 +1,29 @@
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as WaapModule from '@human.tech/waap-sdk';
 import Crystal from './Crystal';
-import { SOLANA_RPC } from './config';
+import {
+  HOLLOW_PROGRAM_ID,
+  IKA_CPI_AUTHORITY_SEED,
+  IKA_DWALLET_PROGRAM_ID,
+  IKA_PREALPHA_GRPC,
+  SOLANA_RPC,
+  SUI_RPC,
+} from './config';
+import {
+  createSolanaConnection,
+  disconnectPhantomWallet,
+  DWALLET_BOOK_PARTS,
+  DWALLET_FLOW_STEPS,
+  getInjectedSolana,
+  IKA_PUBLIC_SITE,
+  IKA_SOLANA_PREALPHA_GUIDE,
+  IKA_SOLANA_PREALPHA_INTRO,
+  IKA_SOLANA_PREALPHA_PRINT,
+  PRE_ALPHA_DISCLAIMER_SHORT,
+  readConnectedPubkey,
+} from './dwallet';
+import { DWalletTools } from './DWalletTools';
 
 type WaapInit = (opts: { config: Record<string, unknown> }) => void;
 const initWaaP =
@@ -103,12 +124,34 @@ async function fetchSolBalanceLamports(pubkey: string): Promise<number | null> {
   return null;
 }
 
+/** Sui balance in mist (1 SUI = 1e9 mist). */
+async function fetchSuiBalanceMist(owner: string): Promise<number | null> {
+  try {
+    const res = await fetch(SUI_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'suix_getBalance',
+        params: [owner],
+      }),
+    });
+    const data = (await res.json()) as { result?: { totalBalance?: string } };
+    if (data.result?.totalBalance !== undefined) return Number(data.result.totalBalance);
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 async function simulateSign(chainName: string): Promise<void> {
   await new Promise((r) => setTimeout(r, 900));
 }
 
-/** Rough USD for demo portfolio total (SOL only live on-chain). */
+/** Rough USD for demo portfolio (live SOL + SUI on-chain × these rates). */
 const SOL_USD_EST = 140;
+const SUI_USD_EST = 3.5;
 
 function formatUsd(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n);
@@ -119,23 +162,53 @@ function formatCrypto(n: number, maxDecimals: number): string {
 }
 
 export const Prism: React.FC = () => {
+  /** Connected Solana address via injected wallet (Phantom / compatible). Direct connect — no wallet-adapter “install” modal. */
+  const [solWalletPk, setSolWalletPk] = useState<string | null>(null);
+  const [solWalletBusy, setSolWalletBusy] = useState(false);
+
+  const solanaConnection = useMemo(() => createSolanaConnection(), []);
+  const initialSolAddressRef = useRef<string>('');
+
   const [phase, setPhase] = useState<Phase>('splash');
   const [chains, setChains] = useState<ChainIdentity[]>([]);
   const [solLamports, setSolLamports] = useState<number | null>(null);
+  const [suiMist, setSuiMist] = useState<number | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [signingId, setSigningId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [justSigned, setJustSigned] = useState<string | null>(null);
-  const [walletTab, setWalletTab] = useState<'assets' | 'activity'>('assets');
+  const [walletTab, setWalletTab] = useState<'assets' | 'activity' | 'guide'>('assets');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [receiveAsset, setReceiveAsset] = useState<'sol' | 'sui'>('sol');
   const [confettiOn, setConfettiOn] = useState(false);
   const [sparkleOn, setSparkleOn] = useState(false);
 
   const pushActivity = useCallback((title: string) => {
     const at = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     setActivity((prev) => [{ id: crypto.randomUUID(), at, title }, ...prev].slice(0, 8));
+  }, []);
+
+  useEffect(() => {
+    const existing = readConnectedPubkey();
+    if (existing) setSolWalletPk(existing);
+  }, []);
+
+  useEffect(() => {
+    const w = getInjectedSolana();
+    if (!w?.on) return;
+    const onAcct = (...args: unknown[]) => {
+      const next = args[0] as { toBase58?: () => string } | undefined;
+      if (next && typeof next.toBase58 === 'function') setSolWalletPk(next.toBase58());
+    };
+    const onDisc = () => setSolWalletPk(null);
+    w.on('accountChanged', onAcct);
+    w.on('disconnect', onDisc);
+    return () => {
+      w.off?.('accountChanged', onAcct);
+      w.off?.('disconnect', onDisc);
+    };
   }, []);
 
   useEffect(() => {
@@ -157,12 +230,74 @@ export const Prism: React.FC = () => {
   const runBoot = useCallback(async () => {
     setPhase('boot');
     const list = await deriveDevIdentities();
-    setChains(list);
+    const connected = readConnectedPubkey();
+    if (connected) setSolWalletPk(connected);
+    initialSolAddressRef.current = list.find((c) => c.id === 'sol')?.address ?? '';
+    const listWithSol = connected
+      ? list.map((c) => (c.id === 'sol' ? { ...c, address: connected } : c))
+      : list;
+    setChains(listWithSol);
     setExpandedId('sol');
-    const lamports = await fetchSolBalanceLamports(list.find((c) => c.id === 'sol')?.address ?? '');
-    setSolLamports(lamports);
+    const solAddr = listWithSol.find((c) => c.id === 'sol')?.address ?? '';
+    const suiAddr = listWithSol.find((c) => c.id === 'sui')?.address ?? '';
+    const [lamports, mist] = await Promise.all([
+      fetchSolBalanceLamports(solAddr),
+      fetchSuiBalanceMist(suiAddr),
+    ]);
+    setSolLamports(lamports !== null ? lamports : 0);
+    setSuiMist(mist !== null ? mist : 0);
     pushActivity('Welcome — your spectrum is ready');
     setPhase('hub');
+  }, [pushActivity]);
+
+  useEffect(() => {
+    if (phase !== 'hub') return;
+    const addr = solWalletPk ?? initialSolAddressRef.current;
+    if (!addr) return;
+    void (async () => {
+      const lamports = await fetchSolBalanceLamports(addr);
+      setSolLamports(lamports !== null ? lamports : 0);
+    })();
+  }, [solWalletPk, phase]);
+
+  useEffect(() => {
+    if (phase !== 'hub') return;
+    setChains((prev) => {
+      const sol = prev.find((c) => c.id === 'sol');
+      if (!sol) return prev;
+      const nextAddr = solWalletPk ?? initialSolAddressRef.current;
+      if (sol.address === nextAddr) return prev;
+      return prev.map((c) => (c.id === 'sol' ? { ...c, address: nextAddr } : c));
+    });
+  }, [solWalletPk, phase]);
+
+  const connectSolanaWallet = useCallback(async () => {
+    setSolWalletBusy(true);
+    try {
+      const w = getInjectedSolana();
+      if (!w?.connect) {
+        pushActivity('Open this page in Chrome or Edge where Phantom is installed — or copy the URL below');
+        return;
+      }
+      const { publicKey } = await w.connect();
+      setSolWalletPk(publicKey.toBase58());
+      pushActivity('Solana wallet connected');
+    } catch {
+      pushActivity('Connection cancelled or failed');
+    }
+    setSolWalletBusy(false);
+  }, [pushActivity]);
+
+  const disconnectSolanaWallet = useCallback(async () => {
+    setSolWalletBusy(true);
+    try {
+      await disconnectPhantomWallet();
+      setSolWalletPk(null);
+      pushActivity('Solana wallet disconnected');
+    } catch {
+      /* ignore */
+    }
+    setSolWalletBusy(false);
   }, [pushActivity]);
 
   const begin = useCallback(
@@ -208,7 +343,9 @@ export const Prism: React.FC = () => {
   );
 
   const solNum = solLamports !== null ? solLamports / 1e9 : 0;
-  const totalUsdEst = solNum * SOL_USD_EST;
+  const suiNum = suiMist !== null ? suiMist / 1e9 : 0;
+  const totalUsdEst = solNum * SOL_USD_EST + suiNum * SUI_USD_EST;
+  const balancesReady = solLamports !== null && suiMist !== null;
 
   if (phase === 'splash') {
     return (
@@ -301,6 +438,8 @@ export const Prism: React.FC = () => {
   }
 
   const solChain = chains.find((c) => c.id === 'sol');
+  const suiChain = chains.find((c) => c.id === 'sui');
+  const receiveChain = receiveAsset === 'sol' ? solChain : suiChain;
 
   /* hub — wallet UI */
   return (
@@ -319,9 +458,23 @@ export const Prism: React.FC = () => {
               <p className="text-[11px] text-white/40">One identity · many chains</p>
             </div>
           </div>
-          <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-400/90 ring-1 ring-emerald-500/20">
-            Devnet
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <button
+              type="button"
+              disabled={solWalletBusy}
+              onClick={() => (solWalletPk ? void disconnectSolanaWallet() : void connectSolanaWallet())}
+              className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-medium text-white/90 ring-1 ring-white/10 hover:bg-white/[0.12] disabled:opacity-50"
+            >
+              {solWalletBusy
+                ? '…'
+                : solWalletPk
+                  ? `Solana · ${solWalletPk.slice(0, 4)}…${solWalletPk.slice(-4)}`
+                  : 'Connect wallet'}
+            </button>
+            <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-400/90 ring-1 ring-emerald-500/20">
+              Devnet
+            </span>
+          </div>
         </header>
 
         <main className="flex flex-1 flex-col px-4 pb-6">
@@ -333,22 +486,80 @@ export const Prism: React.FC = () => {
             <p className="relative mt-1 text-[34px] font-semibold leading-none tracking-tight text-white tabular-nums">
               {formatUsd(totalUsdEst)}
             </p>
-            <p className="relative mt-2 text-[12px] text-white/35">
-              {solLamports !== null ? (
-                <>
-                  {formatCrypto(solNum, 4)} SOL · est. · Practice
-                </>
+            <div className="relative mt-2 text-[12px] text-white/35">
+              {balancesReady ? (
+                <div className="space-y-1.5">
+                  <div className="text-white/40">
+                    {formatCrypto(solNum, 4)} SOL <span className="text-white/30">· est.</span>
+                  </div>
+                  <div className="border-l border-white/15 pl-3 text-white/30">
+                    {formatCrypto(suiNum, 4)} SUI <span className="text-white/25">· under Solana · est.</span>
+                  </div>
+                  <div className="pt-0.5 text-[11px] text-white/25">Practice</div>
+                </div>
               ) : (
                 'Loading…'
               )}
+            </div>
+          </section>
+
+          {/* Solana — direct injected-wallet connect (avoids wallet-adapter “install” UI on localhost) */}
+          <section className="mt-4 rounded-[20px] bg-gradient-to-br from-emerald-950/40 to-zinc-900/80 p-4 ring-1 ring-emerald-500/15">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400/90">Solana · devnet</p>
+            <p className="mt-1 text-[12px] leading-snug text-white/50">
+              Uses your browser wallet (Phantom, etc.) directly — no app-store step. Open this app in{' '}
+              <strong className="font-medium text-white/65">Chrome or Edge</strong> with the extension; IDE previews cannot inject wallets.
             </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                disabled={solWalletBusy}
+                onClick={() => (solWalletPk ? void disconnectSolanaWallet() : void connectSolanaWallet())}
+                className="flex-1 rounded-xl bg-emerald-500/25 py-3 text-[13px] font-semibold text-emerald-100 ring-1 ring-emerald-400/30 disabled:opacity-50"
+              >
+                {solWalletBusy ? '…' : solWalletPk ? 'Disconnect wallet' : 'Connect wallet'}
+              </button>
+              <button
+                type="button"
+                onClick={() => copy('app-origin', typeof window !== 'undefined' ? window.location.href : '')}
+                className="rounded-xl bg-white/[0.06] px-4 py-3 text-[12px] font-medium text-white/75 ring-1 ring-white/[0.08]"
+              >
+                {copied === 'app-origin' ? 'Copied' : 'Copy page URL'}
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] text-white/35">
+              Don&apos;t have Phantom?{' '}
+              <a
+                href="https://phantom.app/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400/80 underline decoration-white/15 underline-offset-2"
+              >
+                phantom.app/download
+              </a>
+            </p>
+            {solWalletPk && (
+              <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
+                <p className="break-all font-mono text-[11px] leading-relaxed text-white/55">{solWalletPk}</p>
+                <button
+                  type="button"
+                  onClick={() => copy('wallet-full', solWalletPk)}
+                  className="w-full rounded-lg bg-white/[0.06] py-2 text-[12px] font-medium text-white/80 ring-1 ring-white/[0.08]"
+                >
+                  {copied === 'wallet-full' ? 'Copied address' : 'Copy devnet address'}
+                </button>
+              </div>
+            )}
           </section>
 
           {/* Quick actions */}
           <div className="mt-5 grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => setReceiveOpen(true)}
+              onClick={() => {
+                setReceiveAsset('sol');
+                setReceiveOpen(true);
+              }}
               className="wallet-quick-tap group flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.06] py-3.5 ring-1 ring-white/[0.06] transition-transform duration-200 active:scale-[0.94]"
             >
               <span className="wallet-action-icon flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-500/15 text-[20px] ring-1 ring-white/10">
@@ -383,7 +594,7 @@ export const Prism: React.FC = () => {
             <button
               type="button"
               onClick={() => setWalletTab('assets')}
-              className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+              className={`flex-1 rounded-lg py-2.5 text-[12px] font-semibold transition sm:text-[13px] ${
                 walletTab === 'assets' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
               }`}
             >
@@ -392,11 +603,20 @@ export const Prism: React.FC = () => {
             <button
               type="button"
               onClick={() => setWalletTab('activity')}
-              className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+              className={`flex-1 rounded-lg py-2.5 text-[12px] font-semibold transition sm:text-[13px] ${
                 walletTab === 'activity' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
               }`}
             >
               Activity
+            </button>
+            <button
+              type="button"
+              onClick={() => setWalletTab('guide')}
+              className={`flex-1 rounded-lg py-2.5 text-[12px] font-semibold transition sm:text-[13px] ${
+                walletTab === 'guide' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+              }`}
+            >
+              dWallet
             </button>
           </div>
 
@@ -405,8 +625,9 @@ export const Prism: React.FC = () => {
               <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-white/35">Facets</p>
               {chains.map((c, idx) => {
                 const isSol = c.id === 'sol';
-                const bal = isSol ? solNum : 0;
-                const usd = isSol ? solNum * SOL_USD_EST : 0;
+                const isSui = c.id === 'sui';
+                const bal = isSol ? solNum : isSui ? suiNum : 0;
+                const usd = isSol ? solNum * SOL_USD_EST : isSui ? suiNum * SUI_USD_EST : 0;
                 const busy = signingId === c.id;
                 const signed = justSigned === c.id;
                 const expanded = expandedId === c.id;
@@ -416,7 +637,7 @@ export const Prism: React.FC = () => {
                     style={{ animationDelay: `${idx * 0.07}s` }}
                     className={`token-row-enter overflow-hidden rounded-2xl ring-1 transition ${
                       signed ? 'bg-emerald-500/5 ring-emerald-500/25 wallet-row-glow' : 'bg-white/[0.04] ring-white/[0.06]'
-                    }`}
+                    } ${isSui ? 'ml-2 border-l border-white/15 pl-2' : ''}`}
                   >
                     <button
                       type="button"
@@ -435,7 +656,7 @@ export const Prism: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-[15px] font-medium tabular-nums text-white/95">
-                          {isSol ? formatCrypto(bal, 4) : formatCrypto(0, 5)}
+                          {isSol || isSui ? formatCrypto(bal, 4) : formatCrypto(0, 5)}
                         </div>
                         <div className="text-[11px] text-white/35">{formatUsd(usd)}</div>
                       </div>
@@ -498,10 +719,115 @@ export const Prism: React.FC = () => {
               )}
             </div>
           )}
+
+          {walletTab === 'guide' && (
+            <div className="mt-4 flex max-h-[min(52vh,420px)] flex-col gap-4 overflow-y-auto rounded-[20px] bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
+              <p className="text-[11px] leading-relaxed text-amber-200/70">{PRE_ALPHA_DISCLAIMER_SHORT}</p>
+              <p className="text-[11px] text-white/35">
+                Official book:{' '}
+                <a
+                  href={IKA_SOLANA_PREALPHA_INTRO}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-200/90 underline decoration-white/20 underline-offset-2"
+                >
+                  Introduction
+                </a>
+                {' · '}
+                <a
+                  href={IKA_SOLANA_PREALPHA_PRINT}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-200/90 underline decoration-white/20 underline-offset-2"
+                >
+                  Full guide (print)
+                </a>
+                {' · '}
+                <a
+                  href={IKA_PUBLIC_SITE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-200/90 underline decoration-white/20 underline-offset-2"
+                >
+                  ika.xyz
+                </a>
+              </p>
+
+              <section>
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">How it works</h2>
+                <ol className="mt-2 list-decimal space-y-2 pl-4 text-[13px] text-white/70">
+                  {DWALLET_FLOW_STEPS.map((s) => (
+                    <li key={s.title}>
+                      <span className="font-medium text-white/85">{s.title}</span>
+                      <span className="text-white/45"> — {s.detail}</span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+
+              <section>
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">What you will learn</h2>
+                <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] text-white/55">
+                  {DWALLET_BOOK_PARTS.map((p) => (
+                    <li key={p.title}>
+                      <span className="font-medium text-white/75">{p.title}</span>
+                      <span className="text-white/40"> — {p.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section>
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Pre-alpha environment (book)</h2>
+                <dl className="mt-2 space-y-1.5 font-mono text-[10px] leading-snug text-white/50">
+                  <div>
+                    <dt className="text-white/35">dWallet gRPC</dt>
+                    <dd className="break-all text-white/60">{IKA_PREALPHA_GRPC}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-white/35">Solana RPC</dt>
+                    <dd className="break-all text-white/60">{SOLANA_RPC}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-white/35">Ika dWallet program (devnet)</dt>
+                    <dd className="break-all text-white/60">{IKA_DWALLET_PROGRAM_ID}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-white/35">CPI authority seed</dt>
+                    <dd className="text-white/60">{IKA_CPI_AUTHORITY_SEED}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-white/35">Your program (VITE_HOLLOW_PROGRAM_ID)</dt>
+                    <dd className="break-all text-white/60">
+                      {HOLLOW_PROGRAM_ID || '— set after deploy'}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <p className="text-[10px] leading-relaxed text-white/30">
+                Rust path: <code className="text-white/45">program/</code>, <code className="text-white/45">client/</code> — wire{' '}
+                <code className="text-white/45">ika-grpc</code> per the book; TS SDK <code className="text-white/45">@ika.xyz/sdk</code> targets Sui-side Ika
+                flows (see package README). Message hashes: keccak256 per Ika message-approval docs.
+              </p>
+
+              <DWalletTools connection={solanaConnection} />
+            </div>
+          )}
         </main>
 
-        <footer className="px-4 pb-6 pt-0 text-center text-[10px] text-white/25">
-          Practice wallet · one beam, many chains · not real funds
+        <footer className="space-y-2 px-4 pb-6 pt-0 text-center text-[10px] text-white/25">
+          <p>Practice wallet · one beam, many chains · not real funds</p>
+          <p>
+            <a
+              href={IKA_SOLANA_PREALPHA_GUIDE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/55"
+            >
+              dWallet Developer Guide (Solana pre-alpha)
+            </a>
+          </p>
         </footer>
       </div>
 
@@ -529,7 +855,7 @@ export const Prism: React.FC = () => {
         </div>
       )}
 
-      {receiveOpen && solChain && (
+      {receiveOpen && receiveChain && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
           role="dialog"
@@ -541,16 +867,40 @@ export const Prism: React.FC = () => {
             className="w-full max-w-md rounded-3xl bg-[#16161c] p-6 ring-1 ring-white/10"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-center text-[11px] font-medium uppercase tracking-wider text-white/40">Receive SOL</p>
-            <p className="mt-4 break-all text-center font-mono text-[12px] leading-relaxed text-white/70">{solChain.address}</p>
+            <p className="text-center text-[11px] font-medium uppercase tracking-wider text-white/40">Receive</p>
+            <div className="mt-4 flex rounded-xl bg-black/40 p-1 ring-1 ring-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setReceiveAsset('sol')}
+                className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+                  receiveAsset === 'sol' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+                }`}
+              >
+                SOL
+              </button>
+              <button
+                type="button"
+                onClick={() => setReceiveAsset('sui')}
+                className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+                  receiveAsset === 'sui' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+                }`}
+              >
+                SUI
+              </button>
+            </div>
+            <p className="mt-2 text-center text-[11px] text-white/35">
+              {receiveAsset === 'sol' ? 'Solana devnet' : 'Sui devnet'}
+            </p>
+            <p className="mt-4 break-all text-center font-mono text-[12px] leading-relaxed text-white/70">{receiveChain.address}</p>
             <button
               type="button"
               onClick={() => {
-                copy('sheet-sol', solChain.address);
+                const key = receiveAsset === 'sol' ? 'sheet-sol' : 'sheet-sui';
+                copy(key, receiveChain.address);
               }}
               className="mt-5 w-full rounded-2xl bg-white py-3.5 text-[15px] font-semibold text-black"
             >
-              {copied === 'sheet-sol' ? 'Copied' : 'Copy address'}
+              {copied === (receiveAsset === 'sol' ? 'sheet-sol' : 'sheet-sui') ? 'Copied' : 'Copy address'}
             </button>
             <button
               type="button"
