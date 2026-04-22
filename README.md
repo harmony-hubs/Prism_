@@ -1,216 +1,229 @@
-# The Hollow — Private Cross-Chain Identity
+# PRISM — Sovereign command for cross-chain identity and private policy
 
 **One identity. Every chain. Nothing exposed.**
 
-Built for **Colosseum Frontier 2026** using **Ika** (2PC-MPC dWallets on Solana) and **Encrypt** (private execution).
+Public repo: **[github.com/harmony-hubs/Prism](https://github.com/harmony-hubs/Prism)** (this codebase).
 
-### Canonical dWallet steps (Solana pre-alpha)
+**[Colosseum Frontier 2026](https://colosseum.com/frontier)** — **Encrypt & Ika** track · [Superteam — Bridgeless & encrypted capital markets](https://superteam.fun/earn/listing/encrypt-ika-frontier-april-2026)
 
-Follow the official book: **[dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/)** · [Introduction](https://solana-pre-alpha.ika.xyz/introduction.html) · [Single-page / print](https://solana-pre-alpha.ika.xyz/print.html). High level: **create dWallet → CPI authority to your program → `approve_message` → signature in MessageApproval** (see the book for prerequisites, Pinocchio/Anchor, gRPC, and testing). Product overview: [ika.xyz](https://ika.xyz/). The PRISM app includes a **dWallet** tab that mirrors this checklist and pre-alpha endpoints, plus an **Operator console**: keccak256 + MessageApproval PDA preview, dWallet inspect, and MessageApproval polling (same account layout as `client/src/main.rs`). **Phantom** in the header swaps the demo SOL row to your real devnet pubkey and balance. Copy `.env.example` to `.env` and set `VITE_HOLLOW_PROGRAM_ID` after you deploy `program/`.
+PRISM is a **Sovereign Command Center** for cross-chain identity: a **Solana controller** + **operator UX** that use **Ika** (2PC-MPC **dWallets** on Solana) for bridgeless `approve_message` / **MessageApproval** flows, and **Encrypt**-shaped **policy gating** (on-chain eligibility before that CPI).  
 
 ---
 
-## The Problem
+## Canonical dWallet steps (Ika Solana pre-alpha)
 
-If you hold assets on Bitcoin, Ethereum, and Solana, your on-chain identity is fragmented and fully public. Anyone can correlate your addresses, see your balances, and front-run your strategies. There is no way to prove "I have collateral" without revealing *which* chains and *how much* on each.
+Follow the official book: **[dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/)** · [Introduction](https://solana-pre-alpha.ika.xyz/introduction.html) · [Print / single page](https://solana-pre-alpha.ika.xyz/print.html). High level: **create dWallet → CPI authority to your program → `approve_message` → signature in MessageApproval**. Product overview: [ika.xyz](https://ika.xyz/).
 
-## The Solution
+In this app, the **Learn / dWallet** area mirrors that checklist, pre-alpha RPC endpoints, and an **Operator console** (CPI PDA, keccak → **MessageApproval** PDA preview, dWallet inspect, approval polling) aligned with `client/`. **Phantom** in the header can swap the Solana row to your **devnet** pubkey and live balance.
 
-**The Hollow** is the first **private, unified cross-chain identity**. It combines two primitives that have never been used together:
+Copy **`.env.example` → `.env`** and set **`VITE_PRISM_PROGRAM_ID`** after you deploy `program/` (legacy: `VITE_HOLLOW_PROGRAM_ID` is still read as a fallback).
 
-| Primitive | What It Does | How The Hollow Uses It |
-|---|---|---|
-| **Ika** | One MPC key controls native BTC, ETH, and SOL addresses — no bridges, no wrapping | A single Hollow identity signs transactions on any chain from one place |
-| **Encrypt** | Encrypted on-chain state with private execution | The link between your addresses is never public. Credentials are selectively disclosable |
+---
 
-## Architecture
+## The problem
 
-```
-┌───────────────────────────────────────────────────────┐
-│                     The Hollow                         │
-│                                                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   Frontend    │  │   Solana     │  │  Rust CLI    │ │
-│  │   (React)     │  │   Program    │  │  (gRPC)      │ │
-│  │              │  │  (Pinocchio) │  │              │ │
-│  │  Login via   │  │              │  │  Create      │ │
-│  │  WaaP/FaceID │  │  init_hollow │  │  dWallets    │ │
-│  │  View worlds │  │  approve_act │  │  via Ika     │ │
-│  │  Prove badges│  │  transfer    │  │  DKG         │ │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘ │
-│         │                 │                  │         │
-│         └────────────┬────┴──────────────────┘         │
-│                      ▼                                  │
-│         ┌─────────────────────────────┐                │
-│         │    Ika dWallet (2PC-MPC)     │                │
-│         │    Program: 87W54k...q1oY    │                │
-│         │                              │                │
-│         │  ┌────────┐ ┌────────┐ ┌────────┐           │
-│         │  │Bitcoin │ │Ethereum│ │Solana  │           │
-│         │  │(native)│ │(native)│ │(native)│           │
-│         │  └────────┘ └────────┘ └────────┘           │
-│         └─────────────────────────────┘                │
-│                                                        │
-│         ┌─────────────────────────────┐                │
-│         │       Encrypt Layer          │                │
-│         │  Encrypted credentials       │                │
-│         │  Selective disclosure         │                │
-│         │  Private condition evaluation │                │
-│         └─────────────────────────────┘                │
-└───────────────────────────────────────────────────────┘
-```
+If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is fragmented** and **defaults to fully public** links between addresses. Proving *“I have collateral or reputation”* without revealing **where** and **how much** is hard. Traditional bridges and custodians add trust and operational overhead.
 
-## Project Structure
+## The solution
+
+| Piece | What it does | How PRISM uses it |
+|-------|----------------|-------------------|
+| **Ika** | MPC dWallets on Solana — **native** chain signing from **approved** messages, not custodial bridges | Our **PRISM program** uses **`ika-dwallet-pinocchio`**, a **CPI PDA**, and **CPI `approve_message`** to the Ika dWallet program; **off-chain** `prism-client` uses `ika-grpc` + `ika-dwallet-types`. |
+| **Encrypt** | Confidential policy / FHE direction on Solana | We ship a **per–message-hash policy PDA** and **`approve_action_gated`**: the **same** Ika CPI only if **`eligible == 1`**. The **demo setter** stands in until **Encrypt `execute_graph` / real CPI** drives eligibility. |
+
+---
+
+## Architecture (high level)
 
 ```
-The_Hollow/
-├── program/                    # Solana on-chain program (Rust/Pinocchio)
-│   ├── Cargo.toml
-│   └── src/lib.rs              # init_hollow, approve_action, transfer_authority
-├── voting/                     # Voting-controlled dWallet (create_proposal, cast_vote)
-│   ├── Cargo.toml
+┌────────────────────────────────────────────────────────────┐
+│                          PRISM                            │
+│  ┌─────────────┐  ┌──────────────────┐  ┌──────────────┐  │
+│  │ Web (Vite)  │  │ PRISM on-chain  │  │ Rust CLI     │  │
+│  │ + Phantom   │  │ Pinocchio +     │  │ (gRPC + RPC)  │  │
+│  │ Learn/Trade  │  │ Ika CPI + gate  │  │ `prism`       │  │
+│  │ Sovereign UI │  │                 │  │              │  │
+│  └──────┬──────┘  └────────┬──────────┘  └──────┬───────┘  │
+│         └──────────────────┴────────────────────┘         │
+│                      Ika dWallet (devnet)                 │
+│         ┌────────────────────────────────────────┐         │
+│   Policy PDA (Encrypt hook) → then approve_message        │
+│   (gated)            │     (ungated approve_action)      │
+│         └────────────────────────────────────────┘         │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Repository layout
+
+```
+.
+├── program/                 # `prism-program` — Ika CPI, Encrypt gate, sovereign PDAs
 │   └── src/lib.rs
-├── client/                     # Off-chain CLI client (Rust/gRPC)
-│   ├── Cargo.toml
-│   └── src/main.rs             # Create dWallets, sign messages, check status
-├── move/                       # Reference contract (Sui Move — vision artifact)
-│   ├── hollow.move
-│   └── Move.toml
-├── src/                        # Frontend (React/Vite)
-│   ├── app.tsx                 # Gamified dashboard with Worlds, Badges, Traps
-│   └── main.tsx                # Entry point
-├── Cargo.toml                  # Rust workspace
+├── client/                  # `prism-client` — binary `prism` (Ika gRPC, txs, policy-*)
+│   └── src/
+├── voting/                  # `prism-voting` — quorum / voting example (Ika patterns)
+├── src/                     # PRISM web app (React + Vite)
+│   ├── app.tsx
+│   ├── boot.tsx
+│   ├── main.tsx
+│   ├── PrismLearn.tsx       # dWallet / Ika + Encrypt story + Operator tools
+│   ├── PrismTrade.tsx      # Jupiter-integrated live swap (separate from devnet demo)
+│   ├── SovereignCommand.tsx
+│   └── dwallet/             # On-chain helpers, Phantom, solanaOnChain, guides
+├── e2e/                     # Playwright (splash → hub → dWallet lab)
+├── move/                    # Sui — `prism.move` (vision / reference; not required for Solana)
+├── scripts/                 # e.g. `prism-sign.ps1`, SBF build helpers
 ├── index.html
 ├── package.json
+├── playwright.config.ts
 ├── vite.config.ts
+├── Cargo.toml               # workspace: program, client, voting
 └── README.md
 ```
 
-## Solana Program (`program/src/lib.rs`)
+---
 
-Built with Pinocchio + `ika-dwallet-pinocchio` for CPI into the Ika dWallet program.
+## On-chain program (`program/src/lib.rs`)
 
-| Instruction | What It Does |
-|---|---|
-| `init_hollow` | Transfers dWallet authority to The Hollow's CPI PDA, making it the sole signer |
-| `approve_action` | Approves a cross-chain message for Ika MPC signing — creates a MessageApproval PDA |
-| `transfer_authority` | Transfers dWallet ownership (recovery, DAO handoff) |
+Pinocchio + [`ika_dwallet_pinocchio`](https://github.com/dwallet-labs/ika-pre-alpha) → CPI to **Ika dWallet program** on devnet (`87W54k…` by default; override via env/CLI in clients).
 
-**How signing works:**
-1. Your program calls `approve_message` via CPI → creates a MessageApproval PDA (status = Pending)
-2. The Ika network detects the MessageApproval account
-3. The NOA (Network Operated Authority) signs using 2PC-MPC
-4. The signature is written on-chain (status = Signed)
-5. Anyone can read the signature from the MessageApproval account
+| Instruction | What it does |
+|-------------|---------------|
+| `init_prism` | Bring dWallet **authorities** under the PRISM **CPI PDA** |
+| `approve_action` | **CPI `approve_message`** → MessageApproval (Ika book layout) |
+| `transfer_authority` | Move dWallet authority (recovery, handoff) |
+| `init_encrypt_policy_gate` / `set_encrypt_policy_eligible` | **Policy PDA** `["prism_policy", owner, message_hash]` — 1 byte eligibility |
+| `approve_action_gated` | Same Ika CPI as `approve_action`, only if **eligible == 1** |
+| `init_sovereign` / `poke_sovereign` / `attest_balance` / `set_armed` | `prism_sovereign` PDA — **heartbeat** + demo **inactivity / panic** thresholds (devnet; plaintext state) |
+| `spring_inactivity` / `spring_panic` | **Permissionless** — transfer dWallets to **recovery** when trip conditions are met (see program) |
 
-## CLI Client (`client/src/main.rs`)
-
-```bash
-# Create a Hollow identity (dWallet via Ika DKG)
-cargo run -- create --keypair ~/.config/solana/id.json
-
-# Approve a cross-chain message for signing
-cargo run -- sign --keypair ~/.config/solana/id.json \
-  --dwallet <DWALLET_ADDRESS> \
-  --message <HEX_HASH> \
-  --scheme ed25519
-
-# Check if the signature is ready
-cargo run -- status --approval <APPROVAL_ADDRESS>
-```
-
-## Frontend (`src/app.tsx`)
-
-Gamified UI that hides all the crypto complexity:
-
-| Tab | What It Does | Under The Hood |
-|---|---|---|
-| **Worlds** | BTC/ETH/SOL shown as game worlds with XP | Ika dWallet controls native addresses |
-| **Badges** | Encrypted credentials with rarity tiers | Encrypt stores data, proofs on reveal |
-| **Team Vote** | Squad missions / proposals | Quorum → CPI `approve_message` on the dWallet |
-| **Quest Log** | Activity feed with +XP rewards | Every action logged |
-
-## Pre-Alpha Environment
-
-| Resource | Endpoint |
-|---|---|
-| dWallet gRPC | `https://pre-alpha-dev-1.ika.ika-network.net:443` |
-| Solana RPC | `https://api.devnet.solana.com` |
-| **Ika dWallet program** (devnet) | `87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY` |
-
-That last id is the **Ika dWallet program** (MessageApproval PDAs, `approve_message` CPI target). Your **own** Pinocchio program gets its own id when you `solana program deploy`. The CPI authority PDA is always `find_program_address(["__ika_cpi_authority"], YOUR_PROGRAM_ID)` — see Ika [CPI framework](https://github.com/dwallet-labs/ika-pre-alpha/blob/main/docs/src/on-chain/cpi-framework.md).
-
-## Ika documentation checklist (this repo)
-
-Aligned with the [ika-pre-alpha](https://github.com/dwallet-labs/ika-pre-alpha) docs:
-
-| Topic | Where in this repo |
-|--------|---------------------|
-| Pinocchio deps + `crate-type` | `program/Cargo.toml`, `voting/Cargo.toml` |
-| `DWalletContext` + `CPI_AUTHORITY_SEED` | `program/src/lib.rs`, `voting/src/lib.rs` |
-| `approve_message` / `transfer_dwallet` data & schemes (0/1/2) | `approve_action`, `cast_vote` |
-| MessageApproval offsets (139 / 140 / 142) | `client/src/main.rs` |
-| **Message hash** | Must be **keccak256** of the raw message (Ika `message-approval.md`) — enforced off-chain when you build txs |
-| gRPC + `ika-dwallet-types` (off-chain) | `client/Cargo.toml` — wire `ika-grpc` calls where marked `TODO` |
-| SBF static syscalls | `solana-define-syscall` in program `Cargo.toml` under `target_os = "solana"` / `target_arch = "bpf"` |
-| Voting example (full layout) | Ika `docs/src/examples/voting/` — our `voting/` crate is a slimmer variant; CPI rules match |
-
-CLI: set **`HOLLOW_PROGRAM_ID`** (or `--hollow-program`) to **your** deployed program id when deriving the CPI PDA — **not** `87W54k...`.
-
-## How to Run
-
-### Frontend
-```bash
-npm install
-npm start
-```
-
-### Solana programs (Rust + `cargo-build-sbf`)
-
-Host check (no Solana CLI required):
-
-```bash
-cargo check -p the-hollow -p hollow-voting
-```
-
-**On-chain (SBF) build** needs the [Agave release](https://github.com/anza-xyz/agave/releases) (includes `cargo-build-sbf`) or a full Solana/Agave install with `cargo-build-sbf` on your `PATH`.
-
-**Windows:** the first build downloads *platform-tools* into your user cache. That step creates **symlinks**. If you see error **1314** (“required privilege…”):
-
-- Turn on **Developer Mode**: Settings → System → **For developers** → **Developer Mode**, then run the build again, **or**
-- Run the terminal **as Administrator** once so the toolchain can install.
-
-From the repo root (PowerShell), after extracting a Windows release to `tools/solana-release/` *or* putting `cargo-build-sbf` on `PATH`:
-
-```powershell
-.\scripts\build-sbf.ps1 -Target all
-# or one crate:
-.\scripts\build-sbf.ps1 -Target program -Verbose
-```
-
-Deploy to devnet (artifact path is printed by the build; name is usually `the_hollow` / `hollow_voting` with underscores):
-
-```bash
-solana program deploy target/deploy/the_hollow.so --url devnet
-```
-
-### CLI Client
-```bash
-# Set your deployed Hollow program id (CPI PDA derivation — see Ika docs)
-export HOLLOW_PROGRAM_ID=<your_deployed_program_pubkey>
-
-cargo run --manifest-path client/Cargo.toml -- create --keypair ~/.config/solana/id.json
-```
-
-## What Makes This Win
-
-- **Novel**: First project combining private identity + multi-chain MPC signing on Solana
-- **Uses Both Primitives**: Ika for bridgeless dWallet control, Encrypt for private credentials
-- **Real Ika Integration**: Solana program with CPI into the Ika dWallet pre-alpha
-- **Real Use Case**: Cross-chain reputation unlocks undercollateralized lending, private DAO membership, anonymous trading
-- **UX-Maxxed**: Gamified UI — normies see zones, loot, and team votes instead of chains, credentials, and governance
-- **Demo-Ready**: User enters The Hollow, proves a cross-chain balance, and signs a BTC transaction from Solana — all without revealing their addresses
+**Signing model (Ika):** your program **CPIs** `approve_message` → **MessageApproval** account → Ika / NOA path produces the signature; **read MessageApproval** for status and sig bytes. Pre-alpha: see book for **mock signer** and wipe risk — **not for real funds**.
 
 ---
 
-*The Hollow — an identity shell that reveals nothing until you decide otherwise.*
+## Frontend (what you actually get)
+
+| Area | What it is |
+|------|------------|
+| **Splash / hub** | Passkey- / Google-**style** entry (WaaP SDK when exports exist) → **Assets** (chain “facets” + est. portfolio), **Activity** |
+| **Learn / dWallet** | Ika + Encrypt narrative, book checklist, **Operator console** (PDA, keccak, inspect, MessageApproval) |
+| **Sovereign** | Devnet **heartbeat / trap** UI when `VITE_PRISM_PROGRAM_ID` is set and Phantom is connected |
+| **Trade** | **Jupiter** plugin — **real Solana** swap surface (not play-money; disclaimer in UI) |
+| **Test sign** (facets) | **Practice** UI feedback — not a full on-chain Ika sign by itself |
+
+---
+
+## Submission snapshot (hackathon reviewers)
+
+| Ask | Where |
+|-----|--------|
+| Public repo | **This repo** |
+| Demo video (under 5 min) | Add link in README or `VIDEO_URL` in a doc you control |
+| Deployed program id | Fill after `solana program deploy` → **`VITE_PRISM_PROGRAM_ID`** |
+| Live app (optional) | e.g. Vercel, or `npm start` at `http://localhost:5173` |
+
+---
+
+## How to run
+
+### Prerequisites
+
+- **Node** 18+ · **Rust** stable  
+- **protoc** on `PATH` for `prism-client` (gRPC) — [gRPC install](https://grpc.io/docs/protoc-installation/)  
+- **Google Chrome** for e2e: `npx playwright install chrome`
+
+### Web app
+
+```bash
+npm install
+npm start
+# or: npm run dev  — Vite @ http://localhost:5173
+```
+
+```bash
+npm run build
+npm run verify         # build + Playwright e2e
+```
+
+### On-chain (host check, no SBF)
+
+```bash
+cargo check -p prism-program -p prism-voting
+```
+
+`cargo check` on **`prism-client`** requires **protoc**; otherwise use the line above, or install protoc and `cargo check --workspace`.
+
+### SBF build & deploy
+
+Use **`cargo-build-sbf`** (Agave / Solana install, or `scripts/build-sbf.ps1`). On **Windows**, symlink errors → enable **Developer Mode** or run the shell elevated once. Deploy artifact is typically under `target/deploy/` with a name derived from the crate (e.g. `prism_program`).
+
+```bash
+solana program deploy target/deploy/prism_program.so --url devnet
+```
+
+Set **`VITE_PRISM_PROGRAM_ID`** (and `PRISM_PROGRAM_ID` for CLI) to **your** deployed id — **not** Ika’s `87W54k…`.
+
+### CLI (examples)
+
+```bash
+export PRISM_PROGRAM_ID=<your_deployed_program_id>
+export IKA_GRPC_URL=https://pre-alpha-dev-1.ika.ika-network.net:443
+export SOLANA_RPC_URL=https://api.devnet.solana.com
+
+cargo run --manifest-path client/Cargo.toml -- create --keypair ~/.config/solana/id.json
+cargo run --manifest-path client/Cargo.toml -- sign --keypair ~/.config/solana/id.json \
+  --dwallet <DWALLET> --message <64_HEX_KECCAK> --chain sol
+cargo run --manifest-path client/Cargo.toml -- policy-init --keypair ~/.config/solana/id.json --message <64_HEX_KECCAK>
+cargo run --manifest-path client/Cargo.toml -- policy-set --keypair ~/.config/solana/id.json --message <64_HEX_KECCAK> --eligible 1
+cargo run --manifest-path client/Cargo.toml -- sign --keypair ~/.config/solana/id.json \
+  --dwallet <DWALLET> --message <64_HEX_KECCAK> --chain sol --gated
+cargo run --manifest-path client/Cargo.toml -- status --approval <MESSAGE_APPROVAL_PUBKEY>
+```
+
+---
+
+## Config
+
+| Var | Role |
+|-----|------|
+| `PRISM_PROGRAM_ID` / CLI `--prism-program` | Your **PRISM** program id (CPI PDA = `["__ika_cpi_authority"], program_id`) |
+| `VITE_PRISM_PROGRAM_ID` | Same for the web app (`VITE_HOLLOW_*` still works as alias) |
+| `VITE_SOLANA_RPC`, `VITE_SUI_RPC`, `VITE_IKA_GRPC`, `VITE_IKA_DWALLET_PROGRAM_ID` | Optional overrides (see `.env.example`) |
+
+---
+
+## Pre-alpha environment (defaults)
+
+| Resource | Value |
+|----------|--------|
+| Ika gRPC | `https://pre-alpha-dev-1.ika.ika-network.net:443` |
+| Solana RPC | `https://api.devnet.solana.com` |
+| Ika dWallet program (devnet) | `87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY` |
+
+CPI PDA: `find_program_address(["__ika_cpi_authority"], YOUR_PRISM_PROGRAM_ID)` — [Ika CPI framework](https://github.com/dwallet-labs/ika-pre-alpha/blob/main/docs/src/on-chain/cpi-framework.md).
+
+---
+
+## Ika docs ↔ this repo
+
+| Topic | Where |
+|-------|--------|
+| `DWalletContext`, `CPI_AUTHORITY_SEED` | `program/src/lib.rs`, `voting/src/lib.rs` |
+| `approve_message` / signature scheme `u16` | `approve_action`, `approve_action_gated`, voting flows |
+| MessageApproval layout (Ika disc 14) | `client/src/main.rs`, `src/dwallet/solanaOnChain.ts` |
+| Message hash | **keccak256** of raw message (Ika message-approval docs) |
+| gRPC | `client/src/ika_client.rs` |
+
+---
+
+## Why PRISM (judging angle)
+
+- **Ika:** on-chain **CPI** to **your** controller + **MessageApproval**-aligned **CLI** and **Operator UI**.  
+- **Encrypt:** **Composable gate** in front of the **same** Ika CPI; roadmap to **real Encrypt** driving eligibility.  
+- **UX + proof:** one shell for **dWallet** education, **Sovereign** devnet tools, and optional **Jupiter** live trading — with clear **pre-alpha** disclaimers.
+
+---
+
+*PRISM — one beam; policy and bridgeless execution where you put them.*
