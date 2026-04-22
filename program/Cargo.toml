@@ -1,11 +1,12 @@
 [package]
-name = "the-hollow"
+name = "prism-program"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 ika-dwallet-pinocchio = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
-pinocchio = "0.10"
+# `cpi` for policy PDA creation; `copy` aligns with ika-dwallet-pinocchio workspace.
+pinocchio = { version = "0.10", features = ["cpi", "copy", "alloc"] }
 pinocchio-system = "0.5"
 # Host `cargo check`: `Address::derive_program_address` / PDA checks (pinocchio’s `solana-address` is `syscalls`-only).
 # `sha2`: PDA derivation. `curve25519`: `is_on_curve` off-chain (needed for `derive_program_address` / `cargo check` on Windows).

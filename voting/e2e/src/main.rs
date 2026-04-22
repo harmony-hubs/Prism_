@@ -7,7 +7,7 @@ const DWALLET_GRPC: &str = "https://pre-alpha-dev-1.ika.ika-network.net:443";
 const DWALLET_PROGRAM_ID: &str = "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY";
 
 #[derive(Parser)]
-#[command(name = "hollow-voting-e2e")]
+#[command(name = "prism-voting-e2e")]
 #[command(about = "End-to-end flow for voting-controlled dWallet signing")]
 struct Cli {
     /// Path to a payer keypair file
@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
     let rpc = RpcClient::new_with_commitment(SOLANA_RPC.to_string(), CommitmentConfig::confirmed());
 
-    println!("=== The Hollow Voting E2E ===");
+    println!("=== PRISM voting E2E ===");
     println!("RPC:            {SOLANA_RPC}");
     println!("Ika gRPC:       {DWALLET_GRPC}");
     println!("dWallet program:{DWALLET_PROGRAM_ID}");

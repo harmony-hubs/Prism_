@@ -1,5 +1,15 @@
 node_modules
 dist
 target
+
+# Secrets & local env (never commit real keys)
+.env
+.env.*
+!.env.example
+
+# Cursor / IDE (local only)
+.cursor/
 # Local Agave/Solana release (download from https://github.com/anza-xyz/agave/releases )
 tools/
+playwright-report/
+test-results/

@@ -1,4 +1,4 @@
-//! Mollusk test scaffold for the Hollow voting program.
+//! Mollusk test scaffold for the PRISM voting program.
 //!
 //! This is intentionally lightweight so you can plug in your existing
 //! Mollusk harness setup from your Solana toolchain.

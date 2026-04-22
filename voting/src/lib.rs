@@ -19,21 +19,17 @@ const STATUS_APPROVED: u8 = 1;
 const VOTE_NO: u8 = 0;
 const VOTE_YES: u8 = 1;
 
-const SIG_ED25519: u8 = 0; // Solana
-const SIG_SECP256K1: u8 = 1; // Bitcoin/Ethereum
-const SIG_SECP256R1: u8 = 2; // Future support
-
-// Proposal account fixed layout (116 bytes)
+// Proposal account fixed layout (117 bytes)
 // [0..32]   creator
 // [32..64]  dwallet
 // [64..96]  message_hash
 // [96..104] yes_votes (u64 LE)
 // [104..112] no_votes (u64 LE)
 // [112]     quorum (u8)
-// [113]     signature_scheme (u8)
-// [114]     status (u8)
-// [115]     approved_bump (u8)
-const PROPOSAL_LEN: usize = 116;
+// [113..115] signature_scheme (u16 LE; UserSignature scheme id)
+// [115]     status (u8)
+// [116]     approved_bump (u8)
+const PROPOSAL_LEN: usize = 117;
 
 // Vote record fixed layout (33 bytes)
 // [0..32] voter pubkey
@@ -97,8 +93,8 @@ pub fn process_instruction(
 /// Data:
 /// [0..32] message_hash
 /// [32]    quorum (u8)
-/// [33]    signature_scheme (0 ed25519, 1 secp256k1, 2 secp256r1)
-/// [34]    approved_bump (message approval PDA bump)
+/// [33..35] signature_scheme (u16 LE; `DWalletSignatureScheme` 0–6 per ika-dwallet-types)
+/// [35]    approved_bump (message approval PDA bump)
 fn create_proposal(
     _program_id: &Address,
     accounts: &[AccountView],
@@ -107,7 +103,7 @@ fn create_proposal(
     if accounts.len() < 3 {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
-    if data.len() < 35 {
+    if data.len() < 36 {
         return Err(ProgramError::InvalidInstructionData);
     }
 
@@ -121,12 +117,11 @@ fn create_proposal(
 
     let message_hash = &data[0..32];
     let quorum = data[32];
-    let signature_scheme = data[33];
-    let approved_bump = data[34];
+    let signature_scheme = u16::from_le_bytes([data[33], data[34]]);
+    let approved_bump = data[35];
 
-    match signature_scheme {
-        SIG_ED25519 | SIG_SECP256K1 | SIG_SECP256R1 => {}
-        _ => return Err(ProgramError::InvalidInstructionData),
+    if signature_scheme > 6 {
+        return Err(ProgramError::InvalidInstructionData);
     }
     if quorum == 0 {
         return Err(ProgramError::InvalidInstructionData);
@@ -144,9 +139,9 @@ fn create_proposal(
     write_u64_le(&mut proposal_data[96..104], 0);
     write_u64_le(&mut proposal_data[104..112], 0);
     proposal_data[112] = quorum;
-    proposal_data[113] = signature_scheme;
-    proposal_data[114] = STATUS_PENDING;
-    proposal_data[115] = approved_bump;
+    proposal_data[113..115].copy_from_slice(&signature_scheme.to_le_bytes());
+    proposal_data[115] = STATUS_PENDING;
+    proposal_data[116] = approved_bump;
 
     Ok(())
 }
@@ -157,13 +152,14 @@ fn create_proposal(
 /// 0. [signer]   voter
 /// 1. [writable] proposal PDA
 /// 2. [writable] vote_record PDA (created once per voter+proposal)
-/// 3. [writable] message_approval PDA
-/// 4. []         dwallet account
-/// 5. [signer]   payer
-/// 6. []         system_program
-/// 7. []         dwallet_program
-/// 8. []         cpi_authority PDA
-/// 9. []         caller_program (this program)
+/// 3. []         DWalletCoordinator PDA
+/// 4. [writable] message_approval PDA
+/// 5. []         dwallet account
+/// 6. [signer]   payer
+/// 7. []         system_program
+/// 8. []         dwallet_program
+/// 9. []         cpi_authority PDA
+/// 10. []        caller_program (this program)
 ///
 /// Data:
 /// [0] vote_value (0 no, 1 yes)
@@ -173,7 +169,7 @@ fn cast_vote(
     accounts: &[AccountView],
     data: &[u8],
 ) -> ProgramResult {
-    if accounts.len() < 10 {
+    if accounts.len() < 11 {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
     if data.len() < 33 {
@@ -183,13 +179,14 @@ fn cast_vote(
     let voter = &accounts[0];
     let proposal = &accounts[1];
     let vote_record = &accounts[2];
-    let message_approval = &accounts[3];
-    let dwallet = &accounts[4];
-    let payer = &accounts[5];
-    let system_program = &accounts[6];
-    let dwallet_program = &accounts[7];
-    let cpi_authority = &accounts[8];
-    let caller_program = &accounts[9];
+    let coordinator = &accounts[3];
+    let message_approval = &accounts[4];
+    let dwallet = &accounts[5];
+    let payer = &accounts[6];
+    let system_program = &accounts[7];
+    let dwallet_program = &accounts[8];
+    let cpi_authority = &accounts[9];
+    let caller_program = &accounts[10];
 
     if !voter.is_signer() || !payer.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
@@ -223,9 +220,9 @@ fn cast_vote(
     let mut yes_votes = read_u64_le(&proposal_data[96..104]);
     let mut no_votes = read_u64_le(&proposal_data[104..112]);
     let quorum = proposal_data[112] as u64;
-    let signature_scheme = proposal_data[113];
-    let status = proposal_data[114];
-    let approved_bump = proposal_data[115];
+    let signature_scheme = u16::from_le_bytes([proposal_data[113], proposal_data[114]]);
+    let status = proposal_data[115];
+    let approved_bump = proposal_data[116];
 
     if status == STATUS_APPROVED {
         return Err(ProgramError::InvalidAccountData);
@@ -240,23 +237,26 @@ fn cast_vote(
     write_u64_le(&mut proposal_data[104..112], no_votes);
 
     if yes_votes >= quorum {
-        let mut message_hash = [0u8; 32];
-        message_hash.copy_from_slice(&proposal_data[64..96]);
+        let mut message_digest = [0u8; 32];
+        message_digest.copy_from_slice(&proposal_data[64..96]);
         let mut user_pubkey = [0u8; 32];
         user_pubkey.copy_from_slice(&data[1..33]);
+        let message_metadata_digest = [0u8; 32];
 
         ctx.approve_message(
+            coordinator,
             message_approval,
             dwallet,
             payer,
             system_program,
-            message_hash,
+            message_digest,
+            message_metadata_digest,
             user_pubkey,
             signature_scheme,
             approved_bump,
         )?;
 
-        proposal_data[114] = STATUS_APPROVED;
+        proposal_data[115] = STATUS_APPROVED;
     }
 
     Ok(())

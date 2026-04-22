@@ -21,12 +21,17 @@ export const IKA_DWALLET_PROGRAM_ID =
   (import.meta as ImportMeta & { env?: { VITE_IKA_DWALLET_PROGRAM_ID?: string } }).env
     ?.VITE_IKA_DWALLET_PROGRAM_ID ?? '87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY';
 
+type ViteEnv = ImportMeta & {
+  env?: { VITE_PRISM_PROGRAM_ID?: string; VITE_HOLLOW_PROGRAM_ID?: string };
+};
+
 /**
- * Your deployed program id (CPI authority PDA = seeds ["__ika_cpi_authority"], YOUR_PROGRAM_ID).
- * Set in .env as VITE_HOLLOW_PROGRAM_ID after deploy.
+ * Your deployed PRISM controller program id (CPI authority PDA = seeds ["__ika_cpi_authority"], this id).
+ * Set `VITE_PRISM_PROGRAM_ID` in `.env` after deploy (`VITE_HOLLOW_PROGRAM_ID` is still read as a fallback).
  */
-export const HOLLOW_PROGRAM_ID =
-  (import.meta as ImportMeta & { env?: { VITE_HOLLOW_PROGRAM_ID?: string } }).env?.VITE_HOLLOW_PROGRAM_ID ??
+export const PRISM_PROGRAM_ID =
+  (import.meta as ViteEnv).env?.VITE_PRISM_PROGRAM_ID ??
+  (import.meta as ViteEnv).env?.VITE_HOLLOW_PROGRAM_ID ??
   '';
 
 /** Matches ika `CPI_AUTHORITY_SEED` / find_program_address(["__ika_cpi_authority"], program_id). */

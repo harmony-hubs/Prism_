@@ -2,28 +2,30 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } fr
 import { Canvas } from '@react-three/fiber';
 import * as WaapModule from '@human.tech/waap-sdk';
 import Crystal from './Crystal';
-import {
-  HOLLOW_PROGRAM_ID,
-  IKA_CPI_AUTHORITY_SEED,
-  IKA_DWALLET_PROGRAM_ID,
-  IKA_PREALPHA_GRPC,
-  SOLANA_RPC,
-  SUI_RPC,
-} from './config';
+import { SOLANA_RPC, SUI_RPC } from './config';
 import {
   createSolanaConnection,
   disconnectPhantomWallet,
-  DWALLET_BOOK_PARTS,
-  DWALLET_FLOW_STEPS,
   getInjectedSolana,
-  IKA_PUBLIC_SITE,
   IKA_SOLANA_PREALPHA_GUIDE,
-  IKA_SOLANA_PREALPHA_INTRO,
-  IKA_SOLANA_PREALPHA_PRINT,
-  PRE_ALPHA_DISCLAIMER_SHORT,
+  PRISM_WELCOME_BULLETS,
   readConnectedPubkey,
 } from './dwallet';
-import { DWalletTools } from './DWalletTools';
+import { SovereignCommand } from './SovereignCommand';
+import { SignatureApprovalModal } from './SignatureApprovalModal';
+
+const PrismLearn = React.lazy(async () => {
+  const m = await import('./PrismLearn');
+  return { default: m.PrismLearn };
+});
+const PrismTrade = React.lazy(async () => {
+  const m = await import('./PrismTrade');
+  return { default: m.PrismTrade };
+});
+const PrismDashboard = React.lazy(async () => {
+  const m = await import('./PrismDashboard');
+  return { default: m.PrismDashboard };
+});
 
 type WaapInit = (opts: { config: Record<string, unknown> }) => void;
 const initWaaP =
@@ -178,12 +180,30 @@ export const Prism: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [justSigned, setJustSigned] = useState<string | null>(null);
-  const [walletTab, setWalletTab] = useState<'assets' | 'activity' | 'guide'>('assets');
+  const [walletTab, setWalletTab] = useState<'assets' | 'activity'>('assets');
+  const [hubMode, setHubMode] = useState<'wallet' | 'learn' | 'trade' | 'command'>('wallet');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [receiveAsset, setReceiveAsset] = useState<'sol' | 'sui'>('sol');
+  const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity } | { kind: 'trade' }>(null);
   const [confettiOn, setConfettiOn] = useState(false);
-  const [sparkleOn, setSparkleOn] = useState(false);
+  const [beamFlashOn, setBeamFlashOn] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('prism-welcome-dismissed-v1') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const dismissWelcome = useCallback(() => {
+    setWelcomeDismissed(true);
+    try {
+      window.localStorage.setItem('prism-welcome-dismissed-v1', '1');
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const pushActivity = useCallback((title: string) => {
     const at = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -318,8 +338,8 @@ export const Prism: React.FC = () => {
   const copy = useCallback((key: string, text: string) => {
     void navigator.clipboard.writeText(text);
     setCopied(key);
-    setSparkleOn(true);
-    setTimeout(() => setSparkleOn(false), 900);
+    setBeamFlashOn(true);
+    setTimeout(() => setBeamFlashOn(false), 900);
     setTimeout(() => setCopied(null), 2000);
   }, []);
 
@@ -332,7 +352,7 @@ export const Prism: React.FC = () => {
         setJustSigned(chain.id);
         setConfettiOn(true);
         setTimeout(() => setConfettiOn(false), 2200);
-        pushActivity(`Done — ${chain.name} (practice)`);
+        pushActivity(`Beamed ${chain.name} (practice)`);
         setTimeout(() => setJustSigned(null), 1600);
       } catch {
         pushActivity("Couldn't complete — tap again");
@@ -342,10 +362,38 @@ export const Prism: React.FC = () => {
     [pushActivity]
   );
 
+  /** Full-view “white → spectrum” refraction when a practice beam completes */
+  useEffect(() => {
+    if (!justSigned) return;
+    document.body.classList.add('prism-flash-burst');
+    const t = window.setTimeout(() => {
+      document.body.classList.remove('prism-flash-burst');
+    }, 900);
+    return () => {
+      window.clearTimeout(t);
+      document.body.classList.remove('prism-flash-burst');
+    };
+  }, [justSigned]);
+
+  const onSignatureApprovalConfirm = useCallback(async () => {
+    if (!sigApproval) return;
+    if (sigApproval.kind === 'chain') {
+      await handleTry(sigApproval.chain);
+    } else {
+      setHubMode('trade');
+    }
+    setSigApproval(null);
+  }, [sigApproval, handleTry]);
+
   const solNum = solLamports !== null ? solLamports / 1e9 : 0;
   const suiNum = suiMist !== null ? suiMist / 1e9 : 0;
   const totalUsdEst = solNum * SOL_USD_EST + suiNum * SUI_USD_EST;
   const balancesReady = solLamports !== null && suiMist !== null;
+  const quickPillFocus: 'receive' | 'chains' | 'activity' = receiveOpen
+    ? 'receive'
+    : walletTab === 'activity'
+      ? 'activity'
+      : 'chains';
 
   if (phase === 'splash') {
     return (
@@ -366,7 +414,7 @@ export const Prism: React.FC = () => {
         </div>
 
         <div className="relative z-10 flex min-h-dvh flex-col">
-          <div className="flex flex-1 flex-col items-center justify-center px-5 pb-10 pt-6 sm:px-8">
+          <div className="flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-6 sm:px-8 sm:pb-16">
             <p className="splash-kicker splash-rise mb-5 text-center">Multi-chain wallet</p>
 
             <h1 className="splash-rise splash-rise-delay-1 font-serif text-[2.85rem] font-normal leading-none tracking-tight sm:text-7xl md:text-8xl">
@@ -387,25 +435,22 @@ export const Prism: React.FC = () => {
                 <span className="text-white/[0.88] not-italic">we reveal the spectrum</span>
                 {' '}in a single beam.
               </p>
-              <div className="mx-auto my-6 h-px max-w-[12rem] bg-gradient-to-r from-transparent via-white/15 to-transparent" aria-hidden />
-              <p className="text-center text-[15px] leading-relaxed text-white/45 sm:text-[16px]">
-                <span className="font-medium text-white/65">Bitcoin · Ethereum · Solana · Sui</span>
-                <br />
-                <span className="mt-2 block text-white/38">No seed phrase — just you</span>
-              </p>
+              <div className="mx-auto mt-5 h-px max-w-[12rem] bg-gradient-to-r from-transparent via-white/15 to-transparent" aria-hidden />
             </div>
 
             <div className="splash-rise splash-rise-delay-4 mt-11 flex w-full max-w-[320px] flex-col gap-3">
               <button
                 type="button"
+                data-testid="splash-continue"
                 onClick={() => begin('passkey')}
                 disabled={loading}
-                className="rounded-2xl bg-gradient-to-r from-[#d4af37] via-[#c9a030] to-[#8b6d24] py-[1.05rem] text-[16px] font-semibold text-black shadow-[0_12px_40px_rgba(212,175,55,0.28)] ring-1 ring-white/20 transition hover:scale-[1.02] hover:shadow-[0_16px_48px_rgba(212,175,55,0.32)] active:scale-[0.98] disabled:opacity-60"
+                className="rounded-2xl bg-gradient-to-r from-[#d4af37] via-[#c9a030] to-[#8b6d24] py-[1.05rem] text-[16px] font-semibold text-black shadow-[0_12px_40px_rgba(212,175,55,0.28)] ring-1 ring-white/20 transition duration-300 hover:scale-[1.02] hover:shadow-[0_16px_48px_rgba(212,175,55,0.3),0_0_32px_rgba(212,175,55,0.45)] active:scale-[0.98] disabled:opacity-60"
               >
                 {loading ? '…' : 'Continue'}
               </button>
               <button
                 type="button"
+                data-testid="splash-google"
                 onClick={() => begin('google')}
                 disabled={loading}
                 className="rounded-2xl border border-white/[0.09] bg-white/[0.04] py-3.5 text-[15px] font-medium text-white/[0.88] shadow-[0_8px_32px_rgba(0,0,0,0.25)] backdrop-blur-sm transition hover:border-white/[0.14] hover:bg-white/[0.07] disabled:opacity-60"
@@ -415,8 +460,8 @@ export const Prism: React.FC = () => {
             </div>
           </div>
 
-          <p className="splash-rise splash-rise-delay-5 px-4 pb-8 text-center text-[11px] tracking-wide text-white/28 sm:text-[12px]">
-            Practice app · not real money
+          <p className="splash-rise splash-rise-delay-5 px-4 pb-10 text-center text-[11px] tracking-wide text-white/28 sm:pb-12 sm:text-[12px]">
+            Hollow Identity · Sovereign Mode Active
           </p>
         </div>
       </div>
@@ -425,7 +470,10 @@ export const Prism: React.FC = () => {
 
   if (phase === 'boot') {
     return (
-      <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#0b0b0f] px-6 text-white">
+      <div
+        data-testid="boot-screen"
+        className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#0b0b0f] px-6 text-white"
+      >
         <div className="boot-aurora pointer-events-none absolute inset-0 opacity-60" aria-hidden />
         <div className="relative mb-8 flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border border-emerald-400/20 wallet-boot-ring" />
@@ -441,188 +489,259 @@ export const Prism: React.FC = () => {
   const suiChain = chains.find((c) => c.id === 'sui');
   const receiveChain = receiveAsset === 'sol' ? solChain : suiChain;
 
-  /* hub — wallet UI */
+  /* hub — wallet UI or separate Learn lab */
   return (
-    <div className="wallet-shell min-h-dvh bg-[#0b0b0f] text-white">
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col shadow-2xl shadow-black/50">
-        <header className="flex items-center justify-between px-4 pt-3 pb-2">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="wallet-logo-breathe flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400/25 to-violet-500/30 ring-1 ring-white/10"
-              aria-hidden
-            >
-              <span className="font-serif text-lg font-semibold text-white/95">P</span>
-            </div>
-            <div>
-              <h1 className="text-[17px] font-semibold leading-tight tracking-tight">PRISM</h1>
-              <p className="text-[11px] text-white/40">One identity · many chains</p>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <button
-              type="button"
-              disabled={solWalletBusy}
-              onClick={() => (solWalletPk ? void disconnectSolanaWallet() : void connectSolanaWallet())}
-              className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-medium text-white/90 ring-1 ring-white/10 hover:bg-white/[0.12] disabled:opacity-50"
-            >
-              {solWalletBusy
-                ? '…'
-                : solWalletPk
-                  ? `Solana · ${solWalletPk.slice(0, 4)}…${solWalletPk.slice(-4)}`
-                  : 'Connect wallet'}
-            </button>
-            <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-400/90 ring-1 ring-emerald-500/20">
-              Devnet
-            </span>
-          </div>
-        </header>
+    <div
+      data-testid="hub-screen"
+      className="wallet-shell flex min-h-dvh flex-col bg-zinc-950/78 text-white ring-1 ring-white/[0.04] backdrop-blur-lg backdrop-saturate-150"
+    >
+      <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col shadow-2xl shadow-black/50">
+        {hubMode === 'learn' ? (
+          <>
+            <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.06] bg-[#0b0b0f]/90 px-3 py-3 backdrop-blur-md">
+              <button
+                type="button"
+                data-testid="learn-back"
+                onClick={() => setHubMode('wallet')}
+                className="rounded-xl bg-white/[0.08] px-3 py-2 text-[12px] font-semibold text-white/90 ring-1 ring-white/10 hover:bg-white/[0.12]"
+              >
+                ← Wallet
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-white/90">How this demo works</p>
+                <p className="truncate text-[10px] text-white/40">Ika · PRISM · optional deep dive</p>
+              </div>
+            </header>
+            <main className="flex max-h-[calc(100dvh-56px)] flex-1 flex-col overflow-y-auto">
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[40vh] items-center justify-center text-[12px] text-white/40">Loading lab…</div>
+                }
+              >
+                <PrismLearn connection={solanaConnection} />
+              </Suspense>
+            </main>
+            <footer className="px-4 pb-4 pt-1 text-center text-[10px] text-white/25">
+              <button
+                type="button"
+                onClick={() => setHubMode('wallet')}
+                className="text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/55"
+              >
+                Back to wallet
+              </button>
+            </footer>
+          </>
+        ) : hubMode === 'command' ? (
+          <Suspense
+            fallback={
+              <div className="flex min-h-dvh items-center justify-center bg-[#0b0b0f] text-[12px] text-white/30">
+                Loading…
+              </div>
+            }
+          >
+            <PrismDashboard
+              solAddressPreview={solWalletPk}
+              networkLabel="Solana · Devnet"
+              onBack={() => setHubMode('wallet')}
+            />
+          </Suspense>
+        ) : hubMode === 'trade' ? (
+          <>
+            <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.06] bg-[#0b0b0f]/90 px-3 py-3 backdrop-blur-md">
+              <button
+                type="button"
+                data-testid="trade-back"
+                onClick={() => setHubMode('wallet')}
+                className="rounded-xl bg-white/[0.08] px-3 py-2 text-[12px] font-semibold text-white/90 ring-1 ring-white/10 hover:bg-white/[0.12]"
+              >
+                ← Wallet
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-white/90">Split the beam</p>
+                <p className="truncate text-[10px] text-white/40">Live swap · future beam agents</p>
+              </div>
+            </header>
+            <main className="flex max-h-[calc(100dvh-56px)] flex-1 flex-col overflow-y-auto">
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[40vh] items-center justify-center text-[12px] text-white/40">
+                    Loading trade…
+                  </div>
+                }
+              >
+                <PrismTrade />
+              </Suspense>
+            </main>
+            <footer className="px-4 pb-4 pt-1 text-center text-[10px] text-white/25">
+              <button
+                type="button"
+                onClick={() => setHubMode('wallet')}
+                className="text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/55"
+              >
+                Back to wallet
+              </button>
+            </footer>
+          </>
+        ) : (
+          <>
+            <header className="flex items-center justify-between border-b border-white/[0.06] px-4 pb-3 pt-3">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="wallet-logo-breathe flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400/25 to-violet-500/30 ring-1 ring-white/10"
+                  aria-hidden
+                >
+                  <span className="font-serif text-lg font-semibold text-white/95">P</span>
+                </div>
+                <div>
+                  <h1 className="text-[17px] font-semibold leading-tight tracking-tight">PRISM</h1>
+                  <p className="text-[11px] text-white/40">Your practice multi-chain pocket</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                <button
+                  type="button"
+                  data-testid="header-connect-wallet"
+                  disabled={solWalletBusy}
+                  onClick={() => (solWalletPk ? void disconnectSolanaWallet() : void connectSolanaWallet())}
+                  className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-medium text-white/90 ring-1 ring-white/10 hover:bg-white/[0.12] disabled:opacity-50"
+                >
+                  {solWalletBusy
+                    ? '…'
+                    : solWalletPk
+                      ? `Solana · ${solWalletPk.slice(0, 4)}…${solWalletPk.slice(-4)}`
+                      : 'Connect wallet'}
+                </button>
+                <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-400/90 ring-1 ring-emerald-500/20">
+                  Devnet
+                </span>
+              </div>
+            </header>
 
-        <main className="flex flex-1 flex-col px-4 pb-6">
-          {/* Portfolio card */}
-          <section className="relative mt-2 overflow-hidden rounded-[22px] bg-gradient-to-br from-zinc-800/90 via-zinc-900/95 to-black p-5 ring-1 ring-white/10">
-            <div className="wallet-hero-shine pointer-events-none absolute inset-0 rounded-[22px] opacity-90" aria-hidden />
-            <div className="wallet-pulse-ring pointer-events-none absolute -inset-px rounded-[22px] opacity-40" aria-hidden />
-            <p className="relative text-[11px] font-medium uppercase tracking-wider text-white/40">Balance across chains</p>
-            <p className="relative mt-1 text-[34px] font-semibold leading-none tracking-tight text-white tabular-nums">
+            <main className="flex min-h-0 flex-1 flex-col px-4 pb-10">
+          {/* Portfolio card (glass “anchor” balance) */}
+          <section className="total-card total-card-sovereign mt-2">
+            <p className="relative z-[1] text-[11px] font-medium text-white/40">Total (est.)</p>
+            <p
+              className="prism-balance-inscribed prism-text-glow relative z-[1] mt-1 text-3xl leading-none text-white tabular-nums sm:text-[34px]"
+            >
               {formatUsd(totalUsdEst)}
             </p>
-            <div className="relative mt-2 text-[12px] text-white/35">
+            <div className="relative z-[1] mt-2 text-[12px] text-white/32">
               {balancesReady ? (
-                <div className="space-y-1.5">
-                  <div className="text-white/40">
-                    {formatCrypto(solNum, 4)} SOL <span className="text-white/30">· est.</span>
-                  </div>
-                  <div className="border-l border-white/15 pl-3 text-white/30">
-                    {formatCrypto(suiNum, 4)} SUI <span className="text-white/25">· under Solana · est.</span>
-                  </div>
-                  <div className="pt-0.5 text-[11px] text-white/25">Practice</div>
-                </div>
+                <p>
+                  {formatCrypto(solNum, 4)} SOL · {formatCrypto(suiNum, 4)} SUI
+                  <span className="text-white/25"> — devnet demo</span>
+                </p>
               ) : (
                 'Loading…'
               )}
             </div>
           </section>
 
-          {/* Solana — direct injected-wallet connect (avoids wallet-adapter “install” UI on localhost) */}
-          <section className="mt-4 rounded-[20px] bg-gradient-to-br from-emerald-950/40 to-zinc-900/80 p-4 ring-1 ring-emerald-500/15">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400/90">Solana · devnet</p>
-            <p className="mt-1 text-[12px] leading-snug text-white/50">
-              Uses your browser wallet (Phantom, etc.) directly — no app-store step. Open this app in{' '}
-              <strong className="font-medium text-white/65">Chrome or Edge</strong> with the extension; IDE previews cannot inject wallets.
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                disabled={solWalletBusy}
-                onClick={() => (solWalletPk ? void disconnectSolanaWallet() : void connectSolanaWallet())}
-                className="flex-1 rounded-xl bg-emerald-500/25 py-3 text-[13px] font-semibold text-emerald-100 ring-1 ring-emerald-400/30 disabled:opacity-50"
-              >
-                {solWalletBusy ? '…' : solWalletPk ? 'Disconnect wallet' : 'Connect wallet'}
-              </button>
-              <button
-                type="button"
-                onClick={() => copy('app-origin', typeof window !== 'undefined' ? window.location.href : '')}
-                className="rounded-xl bg-white/[0.06] px-4 py-3 text-[12px] font-medium text-white/75 ring-1 ring-white/[0.08]"
-              >
-                {copied === 'app-origin' ? 'Copied' : 'Copy page URL'}
-              </button>
-            </div>
-            <p className="mt-2 text-[10px] text-white/35">
-              Don&apos;t have Phantom?{' '}
-              <a
-                href="https://phantom.app/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-emerald-400/80 underline decoration-white/15 underline-offset-2"
-              >
-                phantom.app/download
-              </a>
-            </p>
-            {solWalletPk && (
-              <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
-                <p className="break-all font-mono text-[11px] leading-relaxed text-white/55">{solWalletPk}</p>
-                <button
-                  type="button"
-                  onClick={() => copy('wallet-full', solWalletPk)}
-                  className="w-full rounded-lg bg-white/[0.06] py-2 text-[12px] font-medium text-white/80 ring-1 ring-white/[0.08]"
-                >
-                  {copied === 'wallet-full' ? 'Copied address' : 'Copy devnet address'}
-                </button>
-              </div>
-            )}
-          </section>
-
-          {/* Quick actions */}
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="wallet-pill-rail mt-5 flex items-stretch gap-1.5 rounded-full px-2 py-2 sm:gap-2 sm:px-3 sm:py-2">
             <button
               type="button"
+              data-testid="quick-receive"
               onClick={() => {
                 setReceiveAsset('sol');
                 setReceiveOpen(true);
               }}
-              className="wallet-quick-tap group flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.06] py-3.5 ring-1 ring-white/[0.06] transition-transform duration-200 active:scale-[0.94]"
+              className={`wallet-pill-segment flex-1 rounded-full py-2.5 text-[12px] font-medium sm:py-2 ${
+                quickPillFocus === 'receive' ? 'wallet-pill-segment--active' : 'border border-transparent text-white/42 hover:text-white/85'
+              }`}
             >
-              <span className="wallet-action-icon flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400/20 to-cyan-500/15 text-[20px] ring-1 ring-white/10">
-                ✦
-              </span>
-              <span className="text-[12px] font-medium text-white/85">Receive</span>
+              Receive
             </button>
             <button
               type="button"
-              onClick={() => setWalletTab('assets')}
-              className="wallet-quick-tap group flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.06] py-3.5 ring-1 ring-white/[0.06] transition-transform duration-200 active:scale-[0.94]"
+              data-testid="quick-portfolio"
+              onClick={() => {
+                setWalletTab('assets');
+                pushActivity('Opened portfolio');
+              }}
+              className={`wallet-pill-segment flex-1 rounded-full py-2.5 text-[12px] font-medium sm:py-2 ${
+                quickPillFocus === 'chains' ? 'wallet-pill-segment--active' : 'border border-transparent text-white/42 hover:text-white/85'
+              }`}
             >
-              <span className="wallet-action-icon flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/15 text-[20px] ring-1 ring-white/10">
-                ↑
-              </span>
-              <span className="text-[12px] font-medium text-white/85">Send</span>
+              Chains
             </button>
             <button
               type="button"
+              data-testid="quick-activity"
               onClick={() => setWalletTab('activity')}
-              className="wallet-quick-tap group flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.06] py-3.5 ring-1 ring-white/[0.06] transition-transform duration-200 active:scale-[0.94]"
+              className={`wallet-pill-segment flex-1 rounded-full py-2.5 text-[12px] font-medium sm:py-2 ${
+                quickPillFocus === 'activity' ? 'wallet-pill-segment--active' : 'border border-transparent text-white/42 hover:text-white/85'
+              }`}
             >
-              <span className="wallet-action-icon flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-400/25 to-fuchsia-500/15 text-[18px] ring-1 ring-white/10">
-                ✧
-              </span>
-              <span className="text-[12px] font-medium text-white/85">Activity</span>
+              Activity
             </button>
           </div>
 
+            <div className="mt-3 flex items-center justify-center gap-1 text-[12px] text-white/35">
+              <button type="button" data-testid="open-learn-lab" onClick={() => setHubMode('learn')} className="px-2 py-1 underline decoration-white/15 underline-offset-2 hover:text-white/55">
+                Ika &amp; dWallet
+              </button>
+              <span className="text-white/20">·</span>
+              <button type="button" data-testid="open-command-center" onClick={() => setHubMode('command')} className="px-2 py-1 underline decoration-white/15 underline-offset-2 hover:text-white/55">
+                Overview
+              </button>
+            </div>
+
+          <SovereignCommand connection={solanaConnection} ownerBase58={solWalletPk} />
+
           {/* Tabs */}
-          <div className="mt-6 flex rounded-xl bg-black/40 p-1 ring-1 ring-white/[0.06]">
+          <div className="wallet-segment-wrap mt-6 flex rounded-2xl p-1 ring-1 ring-white/[0.07]">
             <button
               type="button"
+              data-testid="tab-assets"
               onClick={() => setWalletTab('assets')}
-              className={`flex-1 rounded-lg py-2.5 text-[12px] font-semibold transition sm:text-[13px] ${
-                walletTab === 'assets' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+              className={`flex-1 rounded-xl py-3 text-[12px] font-semibold tracking-tight transition sm:text-[13px] ${
+                walletTab === 'assets' ? 'wallet-segment-active text-white' : 'text-white/42 hover:text-white/55'
               }`}
             >
               Assets
             </button>
             <button
               type="button"
+              data-testid="tab-activity"
               onClick={() => setWalletTab('activity')}
-              className={`flex-1 rounded-lg py-2.5 text-[12px] font-semibold transition sm:text-[13px] ${
-                walletTab === 'activity' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+              className={`flex-1 rounded-xl py-3 text-[12px] font-semibold tracking-tight transition sm:text-[13px] ${
+                walletTab === 'activity' ? 'wallet-segment-active text-white' : 'text-white/42 hover:text-white/55'
               }`}
             >
               Activity
             </button>
-            <button
-              type="button"
-              onClick={() => setWalletTab('guide')}
-              className={`flex-1 rounded-lg py-2.5 text-[12px] font-semibold transition sm:text-[13px] ${
-                walletTab === 'guide' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
-              }`}
-            >
-              dWallet
-            </button>
           </div>
 
+          {!welcomeDismissed && (
+            <section
+              data-testid="hub-welcome-card"
+              className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-[13px] font-medium text-white/80">First time here?</h2>
+                <button
+                  type="button"
+                  onClick={dismissWelcome}
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-white/70"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] leading-relaxed text-white/45 marker:text-white/30">
+                {PRISM_WELCOME_BULLETS.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {walletTab === 'assets' && (
-            <div className="mt-4 flex flex-col gap-1">
-              <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-white/35">Facets</p>
+            <div className="mt-6 flex flex-col gap-4">
+              <div className="flex items-end justify-between px-0.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Your chains</p>
+                <p className="text-[10px] text-white/32">Tap a row</p>
+              </div>
               {chains.map((c, idx) => {
                 const isSol = c.id === 'sol';
                 const isSui = c.id === 'sui';
@@ -634,85 +753,110 @@ export const Prism: React.FC = () => {
                 return (
                   <div
                     key={c.id}
+                    data-testid={`facet-row-${c.id}`}
                     style={{ animationDelay: `${idx * 0.07}s` }}
-                    className={`token-row-enter overflow-hidden rounded-2xl ring-1 transition ${
-                      signed ? 'bg-emerald-500/5 ring-emerald-500/25 wallet-row-glow' : 'bg-white/[0.04] ring-white/[0.06]'
-                    } ${isSui ? 'ml-2 border-l border-white/15 pl-2' : ''}`}
+                    className={`group chain-row-spectral token-row-enter overflow-hidden rounded-[20px] ring-1 transition ${
+                      signed
+                        ? 'ring-emerald-400/35 wallet-row-glow wallet-facet-surface'
+                        : `wallet-facet-surface ring-white/[0.08] ${isSui ? 'wallet-facet-sui' : ''}`
+                    }`}
                   >
                     <button
                       type="button"
                       onClick={() => setExpandedId(expanded ? null : c.id)}
-                      className="flex w-full items-center gap-3 px-3 py-3.5 text-left transition hover:bg-white/[0.03]"
+                      className="relative z-[1] flex w-full items-center gap-3.5 px-4 py-4 text-left transition-all duration-300 group-hover:pl-5"
                     >
                       <div
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg"
-                        style={{ backgroundColor: `${c.color}22`, boxShadow: `inset 0 0 0 1px ${c.color}35` }}
+                        className="wallet-chain-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base sm:h-11 sm:w-11 sm:text-lg"
+                        style={{ backgroundColor: `${c.color}28`, boxShadow: `inset 0 0 0 1px ${c.color}45` }}
                       >
                         {c.emoji}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-[15px] text-white/95">{c.name}</div>
-                        <div className="text-[11px] text-white/35">{c.symbol}</div>
+                        <div className="font-semibold text-[15px] tracking-tight text-white/[0.96]">{c.name}</div>
+                        <div className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-white/38">{c.symbol}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[15px] font-medium tabular-nums text-white/95">
+                        <div className="text-[16px] font-semibold tabular-nums tracking-tight text-white/[0.96]">
                           {isSol || isSui ? formatCrypto(bal, 4) : formatCrypto(0, 5)}
                         </div>
-                        <div className="text-[11px] text-white/35">{formatUsd(usd)}</div>
+                        <div className="text-[11px] text-white/38">{formatUsd(usd)}</div>
                       </div>
+                      <span
+                        className={`shrink-0 text-[11px] font-medium text-white/35 transition ${expanded ? 'rotate-90' : ''}`}
+                        aria-hidden
+                      >
+                        ›
+                      </span>
                     </button>
                     {expanded && (
-                      <div className="space-y-3 border-t border-white/[0.06] px-3 py-3">
-                        <p className="break-all font-mono text-[11px] leading-relaxed text-white/45">{c.address}</p>
-                        <div className="flex gap-2">
+                      <div className="relative z-[1] space-y-3 border-t border-white/[0.08] bg-black/20 px-4 py-4">
+                        <p className="wallet-address-box break-all rounded-xl px-3 py-2.5 font-mono text-[11px] leading-relaxed text-white/58">
+                          {c.address}
+                        </p>
+                        <div className="flex gap-2.5">
                           <button
                             type="button"
                             onClick={() => copy(c.id, c.address)}
-                            className="flex-1 rounded-xl bg-white/10 py-2.5 text-[13px] font-semibold text-white/90"
+                            className="flex-1 rounded-xl bg-white/[0.1] py-3 text-[13px] font-semibold text-white/92 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset] transition hover:bg-white/[0.14]"
                           >
                             {copied === c.id ? 'Copied' : 'Copy address'}
                           </button>
                           <button
                             type="button"
+                            data-testid={`test-sign-${c.id}`}
                             disabled={busy || signingId !== null}
-                            onClick={() => handleTry(c)}
-                            className="wallet-btn-bounce flex-1 rounded-xl bg-emerald-500/20 py-2.5 text-[13px] font-semibold text-emerald-300/95 disabled:opacity-40"
+                            onClick={() => setSigApproval({ kind: 'chain', chain: c })}
+                            className="wallet-btn-bounce flash-beam-btn group/flash flex flex-1 items-center justify-center rounded-xl py-3.5"
                           >
-                            {busy ? '…' : 'Test sign'}
+                            <span className="flash-beam-btn__sheen" aria-hidden />
+                            <span className="relative z-10 text-center text-[12px] font-bold uppercase tracking-tight text-zinc-400 transition-colors group-hover/flash:text-white sm:text-[13px]">
+                              {busy ? '…' : 'Flash practice beam'}
+                            </span>
                           </button>
                         </div>
+                        <p className="text-[10px] leading-relaxed text-white/38">
+                          Opens the Sovereign signature sheet (2PC-MPC practice) before the beam.
+                        </p>
                       </div>
                     )}
                   </div>
                 );
               })}
-              <p className="px-1 pt-3 text-center text-[11px] text-white/25">
-                Each chain is a color in the beam—tap a row · Test sign is practice
+              <p className="px-1 pt-2 text-center text-[11px] leading-relaxed text-white/32">
+                Each row is a color in the beam — expand to copy or flash a practice beam
               </p>
             </div>
           )}
 
           {walletTab === 'activity' && (
-            <div className="mt-4 flex flex-col gap-0">
+            <div className="mt-5 flex flex-col gap-2">
               {activity.length === 0 ? (
-                <div className="rounded-2xl bg-white/[0.03] py-14 text-center ring-1 ring-white/[0.06]">
-                  <p className="text-[14px] text-white/45">Nothing in the beam yet</p>
-                  <p className="mt-1 text-[12px] text-white/35">When you move, it shows up here</p>
+                <div className="wallet-activity-empty rounded-[22px] px-6 py-16 text-center ring-1 ring-white/[0.07]">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400/20 to-amber-400/15 text-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset]">
+                    ✧
+                  </div>
+                  <p className="text-[15px] font-medium text-white/55">Quiet in here</p>
+                  <p className="mx-auto mt-2 max-w-[240px] text-[12px] leading-relaxed text-white/38">
+                    Connect Phantom, copy an address, or flash a beam — your moves show up as a little timeline.
+                  </p>
                 </div>
               ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-2">
                   {activity.map((a) => (
                     <li
                       key={a.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.04] px-3 py-3.5 ring-1 ring-white/[0.05]"
+                      className="wallet-activity-row flex items-center justify-between gap-3 rounded-[18px] py-3.5 pl-4 pr-3"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-[13px]">
+                      <div className="flex min-w-0 items-center gap-3 pl-1">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-[14px] shadow-[0_0_0_1px_rgba(255,255,255,0.06)_inset]">
                           ✓
                         </div>
-                        <span className="text-[14px] text-white/80">{a.title}</span>
+                        <span className="truncate text-[14px] font-medium text-white/82">{a.title}</span>
                       </div>
-                      <span className="shrink-0 text-[11px] text-white/35">{a.at}</span>
+                      <span className="shrink-0 rounded-lg bg-black/30 px-2 py-1 font-mono text-[10px] text-white/40">
+                        {a.at}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -720,115 +864,32 @@ export const Prism: React.FC = () => {
             </div>
           )}
 
-          {walletTab === 'guide' && (
-            <div className="mt-4 flex max-h-[min(52vh,420px)] flex-col gap-4 overflow-y-auto rounded-[20px] bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
-              <p className="text-[11px] leading-relaxed text-amber-200/70">{PRE_ALPHA_DISCLAIMER_SHORT}</p>
-              <p className="text-[11px] text-white/35">
-                Official book:{' '}
-                <a
-                  href={IKA_SOLANA_PREALPHA_INTRO}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-amber-200/90 underline decoration-white/20 underline-offset-2"
-                >
-                  Introduction
-                </a>
-                {' · '}
-                <a
-                  href={IKA_SOLANA_PREALPHA_PRINT}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-amber-200/90 underline decoration-white/20 underline-offset-2"
-                >
-                  Full guide (print)
-                </a>
-                {' · '}
-                <a
-                  href={IKA_PUBLIC_SITE}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-amber-200/90 underline decoration-white/20 underline-offset-2"
-                >
-                  ika.xyz
-                </a>
-              </p>
-
-              <section>
-                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">How it works</h2>
-                <ol className="mt-2 list-decimal space-y-2 pl-4 text-[13px] text-white/70">
-                  {DWALLET_FLOW_STEPS.map((s) => (
-                    <li key={s.title}>
-                      <span className="font-medium text-white/85">{s.title}</span>
-                      <span className="text-white/45"> — {s.detail}</span>
-                    </li>
-                  ))}
-                </ol>
-              </section>
-
-              <section>
-                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">What you will learn</h2>
-                <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] text-white/55">
-                  {DWALLET_BOOK_PARTS.map((p) => (
-                    <li key={p.title}>
-                      <span className="font-medium text-white/75">{p.title}</span>
-                      <span className="text-white/40"> — {p.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section>
-                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Pre-alpha environment (book)</h2>
-                <dl className="mt-2 space-y-1.5 font-mono text-[10px] leading-snug text-white/50">
-                  <div>
-                    <dt className="text-white/35">dWallet gRPC</dt>
-                    <dd className="break-all text-white/60">{IKA_PREALPHA_GRPC}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-white/35">Solana RPC</dt>
-                    <dd className="break-all text-white/60">{SOLANA_RPC}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-white/35">Ika dWallet program (devnet)</dt>
-                    <dd className="break-all text-white/60">{IKA_DWALLET_PROGRAM_ID}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-white/35">CPI authority seed</dt>
-                    <dd className="text-white/60">{IKA_CPI_AUTHORITY_SEED}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-white/35">Your program (VITE_HOLLOW_PROGRAM_ID)</dt>
-                    <dd className="break-all text-white/60">
-                      {HOLLOW_PROGRAM_ID || '— set after deploy'}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              <p className="text-[10px] leading-relaxed text-white/30">
-                Rust path: <code className="text-white/45">program/</code>, <code className="text-white/45">client/</code> — wire{' '}
-                <code className="text-white/45">ika-grpc</code> per the book; TS SDK <code className="text-white/45">@ika.xyz/sdk</code> targets Sui-side Ika
-                flows (see package README). Message hashes: keccak256 per Ika message-approval docs.
-              </p>
-
-              <DWalletTools connection={solanaConnection} />
+            <div className="mt-auto w-full border-t border-white/[0.06] pt-5">
+              <button
+                type="button"
+                data-testid="open-trade-beam"
+                onClick={() => setSigApproval({ kind: 'trade' })}
+                className="w-full rounded-2xl bg-gradient-to-r from-amber-500/20 via-violet-500/20 to-cyan-500/15 py-3.5 text-[13px] font-semibold text-white ring-1 ring-white/12 transition duration-300 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+              >
+                Trade (Jupiter)
+              </button>
             </div>
-          )}
         </main>
 
-        <footer className="space-y-2 px-4 pb-6 pt-0 text-center text-[10px] text-white/25">
-          <p>Practice wallet · one beam, many chains · not real funds</p>
-          <p>
-            <a
-              href={IKA_SOLANA_PREALPHA_GUIDE}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/55"
-            >
-              dWallet Developer Guide (Solana pre-alpha)
+        <footer className="prism-engraving mt-auto space-y-2 px-4 pb-10 pt-2 text-center">
+          <p className="prism-hollow-line text-[10px] font-normal leading-relaxed tracking-[0.12em] sm:text-[11px]">
+            Hollow Identity · sovereign mode
+          </p>
+          <p className="prism-hollow-line text-[9px] tracking-[0.18em] sm:text-[10px]">
+            <a href={IKA_SOLANA_PREALPHA_GUIDE} target="_blank" rel="noopener noreferrer" className="font-serif not-italic">
+              dWallet book
             </a>
+            <span> · </span>
+            <span className="font-serif">devnet</span>
           </p>
         </footer>
+          </>
+        )}
       </div>
 
       {confettiOn && (
@@ -849,10 +910,28 @@ export const Prism: React.FC = () => {
         </div>
       )}
 
-      {sparkleOn && (
-        <div className="sparkle-float pointer-events-none fixed bottom-24 left-1/2 z-[65] -translate-x-1/2 text-[15px] font-medium text-amber-200/90">
-          Nice — copied
+      {beamFlashOn && (
+        <div className="beam-flash pointer-events-none fixed bottom-24 left-1/2 z-[65] -translate-x-1/2 text-[15px] font-medium text-amber-200/90">
+          Beamed — copied
         </div>
+      )}
+
+      {sigApproval && (
+        <SignatureApprovalModal
+          isOpen
+          onClose={() => setSigApproval(null)}
+          onApprove={onSignatureApprovalConfirm}
+          contextLine={
+            sigApproval.kind === 'chain'
+              ? `${sigApproval.chain.name} · ${sigApproval.chain.symbol} — practice path`
+              : 'Jupiter · live swap (devnet) — plugin will ask for your wallet after this sheet'
+          }
+          processLine={
+            sigApproval.kind === 'chain'
+              ? '2PC-MPC · Ika dWallet MessageApproval (devnet practice)'
+              : '2PC-MPC · route attestation (devnet practice)'
+          }
+        />
       )}
 
       {receiveOpen && receiveChain && (
@@ -864,10 +943,13 @@ export const Prism: React.FC = () => {
           onKeyDown={(e) => e.key === 'Escape' && setReceiveOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-[#16161c] p-6 ring-1 ring-white/10"
+            className="w-full max-w-md rounded-[28px] bg-gradient-to-b from-zinc-900/98 to-[#0f0f14] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_24px_64px_rgba(0,0,0,0.5)] ring-1 ring-white/10 backdrop-blur-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-center text-[11px] font-medium uppercase tracking-wider text-white/40">Receive</p>
+            <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Receive</p>
+            <p className="mt-2 text-center text-[12px] leading-snug text-white/45">
+              Share this address if you want someone to send you <span className="text-white/60">test</span> coins on devnet
+            </p>
             <div className="mt-4 flex rounded-xl bg-black/40 p-1 ring-1 ring-white/[0.06]">
               <button
                 type="button"

@@ -1,15 +1,34 @@
 [package]
-name = "hollow-client"
+name = "prism-client"
 version = "0.1.0"
 edition = "2024"
+
+[[bin]]
+name = "prism"
+path = "src/main.rs"
 
 [dependencies]
 ika-grpc = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
 ika-dwallet-types = { git = "https://github.com/dwallet-labs/ika-pre-alpha" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-solana-sdk = "2"
-solana-client = "2"
-clap = { version = "4", features = ["derive"] }
+# Do not use `solana-sdk` here: default `full` pulls `solana-secp256r1-program` → OpenSSL on Windows.
+solana-pubkey = { version = "2.2", features = ["curve25519"] }
+solana-keypair = "2.2"
+solana-signature = "2.2"
+solana-signer = "2.2"
+solana-transaction = { version = "2.2", features = ["bincode"] }
+solana-instruction = "2.2"
+solana-hash = "2.2"
+solana-account = "2.2"
+solana-commitment-config = "2.2"
+solana-clock = "2.2"
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+base64 = "0.22"
+bincode = "1.3"
 bs58 = "0.5"
-# Windows: `solana-sdk` pulls OpenSSL (`solana-secp256r1-program`). Install OpenSSL (e.g. https://slproweb.com/products/Win32OpenSSL.html)
-# and set `OPENSSL_DIR`, or build in WSL/Linux. (`openssl` crate feature `vendored` needs Perl on Windows.)
+bcs = "0.1"
+tonic = { version = "0.14", features = ["tls-webpki-roots"] }
+hex = "0.4"
+anyhow = "1"
+serde_json = "1"

@@ -1,5 +1,5 @@
 {
-  "name": "the-hollow",
+  "name": "prism",
   "version": "1.0.0",
   "description": "PRISM — minimal multi-chain wallet experience (practice mode)",
   "main": "src/app.tsx",
@@ -7,7 +7,11 @@
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify": "npm run build && npm run test:e2e",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@human.tech/waap-sdk": "latest",
@@ -27,6 +31,7 @@
     "three": "^0.183.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "latest",
     "vite": "latest"
