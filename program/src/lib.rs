@@ -1,4 +1,8 @@
 #![no_std]
+//! On-chain **PRISM** controller: Ika dWallet `approve_message` CPI, optional Encrypt-gated approval, sovereign PDAs.
+//!
+//! Aligns with the [Ika dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/print.html). CPI authority PDA uses
+//! `ika_dwallet_pinocchio::CPI_AUTHORITY_SEED` (`__ika_cpi_authority`).
 extern crate alloc;
 
 use ika_dwallet_pinocchio::{CPI_AUTHORITY_SEED, DWalletContext};

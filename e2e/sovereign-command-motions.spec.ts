@@ -187,15 +187,15 @@ test.describe('Sovereign Command Center — full motions (mocked chain)', () => 
     await test.step('Sovereign panel visible; initialize', async () => {
       const panel = page.getByTestId('sovereign-panel');
       await expect(panel).toBeVisible();
-      await expect(panel.getByText(/Sovereign Command/i).first()).toBeVisible();
+      await expect(panel.getByRole('heading', { name: 'Sovereign' })).toBeVisible();
       await page.getByTestId('sovereign-init').click();
       await expect(page.getByTestId('sovereign-status')).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByTestId('sovereign-status')).toContainText(/ARMED.*heartbeat fresh/i);
+      await expect(page.getByTestId('sovereign-status')).toContainText(/Armed & checked in/i);
     });
 
-    await test.step('Poke (heartbeat)', async () => {
+    await test.step('Check in (heartbeat)', async () => {
       await page.getByTestId('sovereign-poke').click();
-      await expect(page.getByTestId('sovereign-status')).toContainText(/ARMED.*heartbeat fresh/i, { timeout: 10_000 });
+      await expect(page.getByTestId('sovereign-status')).toContainText(/Armed & checked in/i, { timeout: 10_000 });
     });
 
     await test.step('Attest above panic floor (demo: 5000)', async () => {
@@ -206,24 +206,24 @@ test.describe('Sovereign Command Center — full motions (mocked chain)', () => 
 
     await test.step('Disarm', async () => {
       await page.getByTestId('sovereign-disarm').click();
-      await expect(page.getByTestId('sovereign-status')).toContainText('DISARMED', { timeout: 10_000 });
+      await expect(page.getByTestId('sovereign-status')).toContainText('Disarmed', { timeout: 10_000 });
     });
 
     await test.step('Re-arm from disarmed', async () => {
       await page.getByTestId('sovereign-rearm').click();
-      await expect(page.getByTestId('sovereign-status')).toContainText(/ARMED.*heartbeat fresh/i, { timeout: 10_000 });
+      await expect(page.getByTestId('sovereign-status')).toContainText(/Armed & checked in/i, { timeout: 10_000 });
     });
 
-    await test.step('Simulate inactivity trip (mock) → TRIPPED copy', async () => {
+    await test.step('Simulate inactivity trip (mock) → tripped copy', async () => {
       await page.evaluate(() => (window as unknown as { e2ePrismSovereignForceTripInactivity: () => void }).e2ePrismSovereignForceTripInactivity());
       await page.waitForTimeout(4500);
-      await expect(page.getByTestId('sovereign-status')).toContainText('TRIPPED', { timeout: 10_000 });
-      await expect(page.getByText(/inactivity/i).first()).toBeVisible();
+      await expect(page.getByTestId('sovereign-status')).toContainText(/Tripped: inactivity/i, { timeout: 10_000 });
+      await expect(page.getByText(/inactivity window passed/i).first()).toBeVisible();
     });
 
     await test.step('Re-arm clears trip in UI', async () => {
       await page.getByTestId('sovereign-rearm').click();
-      await expect(page.getByTestId('sovereign-status')).toContainText(/ARMED.*heartbeat fresh/i, { timeout: 10_000 });
+      await expect(page.getByTestId('sovereign-status')).toContainText(/Armed & checked in/i, { timeout: 10_000 });
     });
   });
 });

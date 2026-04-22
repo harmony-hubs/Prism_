@@ -1,3 +1,5 @@
+//! `prism` CLI — Ika gRPC (DKG, sign) + Solana txs for the PRISM program. Instruction discriminators match
+//! `program/src/lib.rs`. Reference: [Ika dWallet book](https://solana-pre-alpha.ika.xyz/print.html) (pre-alpha).
 mod ika_client;
 mod rpc_light;
 

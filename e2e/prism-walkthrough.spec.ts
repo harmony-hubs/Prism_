@@ -48,10 +48,10 @@ test.describe('PRISM — scripted walkthrough (Chrome)', () => {
       await expect(page.getByText('Revealing your spectrum')).toBeVisible();
     });
 
-    await test.step('4. Hub — portfolio and Devnet badge', async () => {
+    await test.step('4. Hub — portfolio and Preview (devnet) badge', async () => {
       await expect(page.getByTestId('hub-screen')).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText('Total (est.)')).toBeVisible();
-      await expect(page.getByText('Devnet', { exact: true }).first()).toBeVisible();
+      await expect(page.getByTestId('network-preview-badge')).toBeVisible();
     });
 
     await test.step('5. Connect dev wallet (mock injected Solana)', async () => {
@@ -59,9 +59,10 @@ test.describe('PRISM — scripted walkthrough (Chrome)', () => {
       await expect(page.getByTestId('header-connect-wallet')).toContainText(/Solana/);
     });
 
-    await test.step('6. Activity tab — see welcome line', async () => {
+    await test.step('6. Activity tab — see Start here / vision lede', async () => {
       await page.getByTestId('tab-activity').click();
-      await expect(page.getByText(/Welcome|spectrum/i)).toBeVisible();
+      await expect(page.getByText('Start here')).toBeVisible();
+      await expect(page.getByTestId('hub-welcome-lede')).toBeVisible();
     });
 
     await test.step('7. Assets — expand Sol facet, run Test sign', async () => {

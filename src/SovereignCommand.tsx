@@ -32,6 +32,29 @@ function beamClass(state: SovereignState | null, accountMissing: boolean): strin
   return BEAM.idle;
 }
 
+function statusLine(
+  st: SovereignState,
+  heartbeatFresh: boolean,
+): { label: string; detail?: string; tone: 'ok' | 'warn' | 'off' | 'alert' } {
+  if (st.tripped === 'inactivity') {
+    return { label: 'Tripped: inactivity', detail: 'The inactivity window passed while armed.', tone: 'alert' };
+  }
+  if (st.tripped === 'panic') {
+    return { label: 'Tripped: balance', detail: 'Attested value fell below the demo floor.', tone: 'alert' };
+  }
+  if (st.isArmed) {
+    if (heartbeatFresh) {
+      return { label: 'Armed & checked in', detail: 'Heartbeat is inside your inactivity window.', tone: 'ok' };
+    }
+    return {
+      label: 'Armed — check-in needed',
+      detail: 'Poke to refresh the timer, or anyone may run the inactivity path (CLI on devnet).',
+      tone: 'warn',
+    };
+  }
+  return { label: 'Disarmed', detail: 'Traps are off. Re-arm to start monitoring again.', tone: 'off' };
+}
+
 export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) => {
   const [currentSlot, setCurrentSlot] = useState<bigint | null>(null);
   const [onChain, setOnChain] = useState<SovereignState | null | undefined>(undefined);
@@ -117,7 +140,6 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
     [programId, owner, pda, canSign, connection, ownerBase58, refresh],
   );
 
-  /** Do not place hooks after conditional returns — it breaks the Rules of Hooks (white screen on connect / env change). */
   const st = onChain === undefined ? null : onChain;
   const heartbeatFresh = useMemo(() => {
     if (!st || !st.isArmed || st.tripped !== 'none') return false;
@@ -126,20 +148,20 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
     return st.lastHeartbeatSlot + st.inactivityLimitSlots > currentSlot;
   }, [st, currentSlot]);
 
+  const sectionShell =
+    'sovereign-facet relative mt-5 overflow-hidden rounded-[22px] p-4 ring-1 ring-white/[0.08]';
+
   if (!PRISM_PROGRAM_ID?.trim()) {
     return (
-      <section
-        data-testid="sovereign-panel"
-        className="sovereign-facet relative mt-5 overflow-hidden rounded-[22px] p-4 ring-1 ring-white/[0.08]"
-      >
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign Command Center</h2>
+      <section data-testid="sovereign-panel" className={sectionShell}>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
         <details className="mt-2 group rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-1.5">
           <summary className="cursor-pointer list-none text-[10px] text-white/40 outline-none transition hover:text-white/60 [&::-webkit-details-marker]:hidden">
             <span className="tracking-wide">Environment (devnet)</span>
           </summary>
           <p className="mt-1.5 text-[10px] leading-relaxed text-white/32">
-            Set <code className="font-mono text-white/50">VITE_PRISM_PROGRAM_ID</code> in <code className="font-mono text-white/50">.env</code>, then restart
-            the dev server.
+            Set <code className="font-mono text-white/50">VITE_PRISM_PROGRAM_ID</code> in <code className="font-mono text-white/50">.env</code>, then
+            restart the dev server.
           </p>
         </details>
       </section>
@@ -148,11 +170,8 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
 
   if (!programId) {
     return (
-      <section
-        data-testid="sovereign-panel"
-        className="sovereign-facet relative mt-5 overflow-hidden rounded-[22px] p-4 ring-1 ring-amber-500/20"
-      >
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign Command Center</h2>
+      <section data-testid="sovereign-panel" className={`${sectionShell} ring-amber-500/20`}>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
         <p className="mt-1 text-[11px] text-amber-200/85">
           <code className="font-mono">VITE_PRISM_PROGRAM_ID</code> is not a valid Solana address. Fix <code className="font-mono">.env</code> and
           restart the dev server.
@@ -163,38 +182,31 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
 
   if (!ownerBase58?.trim()) {
     return (
-      <section
-        data-testid="sovereign-panel"
-        className="sovereign-facet relative mt-5 overflow-hidden rounded-[22px] p-4 ring-1 ring-white/[0.08]"
-      >
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign Command Center</h2>
-        <p className="mt-1 text-[12px] text-white/40">Connect Solana to view heartbeat and trap countdown.</p>
+      <section data-testid="sovereign-panel" className={sectionShell}>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-white/45">
+          Connect Solana to use this devnet demo: a small on-chain “watch” for inactivity and (optional) a demo balance
+          floor, backed by your PRISM program.
+        </p>
       </section>
     );
   }
 
   if (!owner) {
     return (
-      <section
-        data-testid="sovereign-panel"
-        className="sovereign-facet relative mt-5 overflow-hidden rounded-[22px] p-4 ring-1 ring-amber-500/20"
-      >
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign Command Center</h2>
+      <section data-testid="sovereign-panel" className={`${sectionShell} ring-amber-500/20`}>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
         <p className="mt-1 text-[11px] text-amber-200/80">Connected address is not valid base58. Disconnect and reconnect your wallet.</p>
       </section>
     );
   }
 
   const accountMissing = onChain === null;
-
   const deadline =
-    st && st.inactivityLimitSlots > 0n && st.tripped === 'none'
-      ? st.lastHeartbeatSlot + st.inactivityLimitSlots
-      : null;
+    st && st.inactivityLimitSlots > 0n && st.tripped === 'none' ? st.lastHeartbeatSlot + st.inactivityLimitSlots : null;
   const slotsLeft =
-    currentSlot != null && deadline != null
-      ? deadline - currentSlot
-      : null;
+    currentSlot != null && deadline != null ? deadline - currentSlot : null;
+  const line = st && !accountMissing ? statusLine(st, heartbeatFresh) : null;
 
   return (
     <section
@@ -205,63 +217,90 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
         className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${beamClass(st, accountMissing)} opacity-50`}
         aria-hidden
       />
-      <div className="relative">
-        <h2 className="text-[15px] font-semibold tracking-tight text-white/92">Sovereign Command</h2>
-        <p className="mt-1 text-[11px] leading-relaxed text-white/42">
-          Ika CPI PDA = armed · heartbeat resets inactivity · Encrypt can hide thresholds later
-        </p>
+      <div className="relative space-y-4">
+        {/* —— Intro —— */}
+        <header className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">On-chain (devnet)</p>
+          <h2 className="text-[15px] font-semibold tracking-tight text-white/92">Sovereign</h2>
+          <p className="text-[11px] leading-relaxed text-white/45">
+            One PDA on your program keeps demo timers: while <span className="text-white/70">armed</span>, a periodic check-in
+            and optional attested value can trigger <span className="text-white/70">traps</span> (inactivity or balance, per
+            program). Advanced paths use the Ika book + CLI; this card is a simple control surface.
+          </p>
+        </header>
+
         <div
-          className="relative mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]"
+          className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]"
           data-testid="sovereign-beam"
         >
           <div
             className={`h-full min-h-1.5 w-full bg-gradient-to-r ${beamClass(st, accountMissing)} transition-[opacity] duration-500`}
           />
         </div>
-        {st && !accountMissing && (
+
+        {/* —— Status —— */}
+        {onChain === undefined && <p className="text-[11px] text-white/40">Loading…</p>}
+
+        {st && !accountMissing && line && (
           <div
             data-testid="sovereign-status"
-            className={`mt-3 flex flex-wrap items-baseline gap-2.5 rounded-xl border px-3 py-2.5 transition ${
-              st.isArmed && st.tripped === 'none' && heartbeatFresh
-                ? 'border-sky-400/40 bg-sky-500/[0.12] shadow-[0_0_24px_rgba(56,189,248,0.2)]'
-                : 'border-white/[0.08] bg-white/[0.04]'
+            className={`rounded-xl border px-3 py-3 ${
+              line.tone === 'ok'
+                ? 'border-sky-400/40 bg-sky-500/[0.12] shadow-[0_0_20px_rgba(56,189,248,0.15)]'
+                : line.tone === 'warn'
+                  ? 'border-amber-500/30 bg-amber-500/[0.08]'
+                  : line.tone === 'alert'
+                    ? 'border-rose-500/35 bg-rose-500/[0.08]'
+                    : 'border-white/[0.08] bg-white/[0.04]'
             }`}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">Status</span>
-            <span
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Status</p>
+            <p
               className={
-                st.tripped !== 'none'
-                  ? 'text-[12px] font-semibold text-rose-200/90'
-                  : st.isArmed
-                    ? heartbeatFresh
-                      ? 'text-[12px] font-semibold text-sky-100/95'
-                      : 'text-[12px] font-semibold text-amber-200/85'
-                    : 'text-[12px] font-medium text-white/45'
+                line.tone === 'ok'
+                  ? 'mt-1 text-[13px] font-semibold text-sky-100/95'
+                  : line.tone === 'warn'
+                    ? 'mt-1 text-[13px] font-semibold text-amber-200/90'
+                    : line.tone === 'alert'
+                      ? 'mt-1 text-[13px] font-semibold text-rose-200/90'
+                      : 'mt-1 text-[13px] font-medium text-white/55'
               }
             >
-              {st.tripped !== 'none'
-                ? st.tripped === 'inactivity'
-                  ? 'TRIPPED — inactivity'
-                  : 'TRIPPED — panic'
-                : st.isArmed
-                  ? heartbeatFresh
-                    ? 'ARMED — heartbeat fresh'
-                    : 'ARMED — window passed (permissionless spring_inactivity)'
-                  : 'DISARMED'}
-            </span>
+              {line.label}
+            </p>
+            {line.detail && <p className="mt-1.5 text-[11px] leading-relaxed text-white/50">{line.detail}</p>}
           </div>
         )}
-        {st && st.tripped !== 'none' && (
-          <p className="mt-2 text-[11px] font-medium text-rose-200/90">
-            Trap fired: {st.tripped === 'inactivity' ? 'inactivity' : 'balance shield'}. Re-arm in Operator flow when ready.
-          </p>
-        )}
 
-        {onChain === undefined && <p className="mt-2 text-[11px] text-white/40">Loading state…</p>}
+        <details className="group rounded-lg border border-white/[0.06] bg-black/20 px-2.5 py-2 text-[11px] text-white/50">
+          <summary className="cursor-pointer list-none text-[11px] font-medium text-white/60 outline-none transition hover:text-white/75 [&::-webkit-details-marker]:hidden">
+            What do the buttons do?
+          </summary>
+          <ul className="mt-2 space-y-1.5 pl-3 text-[10px] leading-relaxed text-white/40 [list-style:disc]">
+            <li>
+              <span className="text-white/55">Initialize</span> — create the PDA with demo limits (devnet, first time only).
+            </li>
+            <li>
+              <span className="text-white/55">Check in</span> — refresh the inactivity clock while armed.
+            </li>
+            <li>
+              <span className="text-white/55">Disarm</span> — pause traps without closing the PDA.
+            </li>
+            <li>
+              <span className="text-white/55">Attest</span> — set a demo number for the balance floor (optional).
+            </li>
+            <li>
+              <span className="text-white/55">Re-arm</span> — turn monitoring back on or clear a trip in this demo.
+            </li>
+          </ul>
+        </details>
 
+        {/* —— First time —— */}
         {accountMissing && onChain !== undefined && (
-          <div className="mt-3 space-y-2">
-            <p className="text-[11px] text-white/50">No `prism_sovereign` PDA yet. Initialize with demo values (devnet only).</p>
+          <div className="space-y-2 border-t border-white/[0.06] pt-4" data-testid="sovereign-setup">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Set up (once)</h3>
+            <p className="text-[11px] text-white/50">No <code className="font-mono text-[10px] text-white/60">prism_sovereign</code> PDA for this
+              wallet yet. Create it with the defaults below.</p>
             <button
               type="button"
               data-testid="sovereign-init"
@@ -275,51 +314,64 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
                       o,
                       s,
                       o,
-                      1_200n, // ~8 min of slots at ~400ms/slot
-                      5_000n, // demo panic floor: attest below this to arm spring_panic
+                      1_200n,
+                      5_000n,
                       true,
                     ),
                   );
                   return t;
                 })
               }
-              className="rounded-xl bg-sky-500/25 px-3 py-2 text-[12px] font-medium text-sky-100/95 ring-1 ring-sky-400/30 hover:bg-sky-500/35 disabled:opacity-50"
+              className="w-full rounded-xl bg-sky-500/25 px-3 py-2.5 text-[12px] font-medium text-sky-100/95 ring-1 ring-sky-400/30 hover:bg-sky-500/35 disabled:opacity-50"
             >
-              {busy === 'Initialize command center' ? '…' : 'Initialize (demo)'}
+              {busy === 'Initialize command center' ? '…' : 'Create PDA (demo defaults)'}
             </button>
           </div>
         )}
 
+        {/* —— Numbers —— */}
         {st && !accountMissing && (
-          <ul className="mt-3 space-y-1.5 text-[11px] text-white/55">
-            <li>
-              Armed: <span className="text-white/85">{st.isArmed ? 'yes' : 'no'}</span> · inactivity:{' '}
-              <span className="font-mono text-white/80">{st.inactivityLimitSlots.toString()}</span> slots
-            </li>
-            <li>
-              Panic floor (demo):{' '}
-              <span className="font-mono text-white/80">{st.panicFloor.toString()}</span> · last attested:{' '}
-              <span className="font-mono text-white/80">{st.lastAttestedNative.toString()}</span>
-            </li>
-            <li>
-              Countdown:{' '}
-              {st.inactivityLimitSlots === 0n || st.tripped !== 'none' ? (
-                <span>— (off or tripped)</span>
-              ) : slotsLeft !== null && slotsLeft >= 0n ? (
-                <span>
-                  <span className="font-mono text-sky-200/90">{slotsLeft.toString()}</span> slots (~
-                  {Math.max(0, (Number(slotsLeft) * 0.4) / 60).toFixed(1)} min @ ~0.4s/slot)
-                </span>
-              ) : (
-                <span className="text-amber-200/90">overdue — anyone can run `spring_inactivity` (CLI)</span>
-              )}
-            </li>
-            {currentSlot != null && <li className="text-white/35">Current slot: {currentSlot.toString()}</li>}
-          </ul>
+          <div className="space-y-2 border-t border-white/[0.06] pt-4">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Snapshot</h3>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2" role="list">
+              <div className="rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.05]" role="listitem">
+                <p className="text-[10px] text-white/38">Inactivity window</p>
+                <p className="mt-0.5 font-mono text-[12px] text-white/80">
+                  {st.inactivityLimitSlots === 0n ? 'off' : `${st.inactivityLimitSlots.toString()} slots`}
+                </p>
+              </div>
+              <div className="rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.05]" role="listitem">
+                <p className="text-[10px] text-white/38">Demo panic floor</p>
+                <p className="mt-0.5 font-mono text-[12px] text-white/80">{st.panicFloor.toString()}</p>
+              </div>
+              <div className="rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.05] sm:col-span-2" role="listitem">
+                <p className="text-[10px] text-white/38">Last attested (demo unit)</p>
+                <p className="mt-0.5 font-mono text-[12px] text-white/80">{st.lastAttestedNative.toString()}</p>
+              </div>
+              <div className="rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.05] sm:col-span-2" role="listitem">
+                <p className="text-[10px] text-white/38">Time left (inactivity)</p>
+                <p className="mt-0.5 text-[12px] text-white/75">
+                  {st.inactivityLimitSlots === 0n || st.tripped !== 'none' ? (
+                    <span className="text-white/45">— (off or tripped)</span>
+                  ) : slotsLeft !== null && slotsLeft >= 0n ? (
+                    <span>
+                      <span className="font-mono text-sky-200/90">{slotsLeft.toString()}</span> slots (~
+                      {Math.max(0, (Number(slotsLeft) * 0.4) / 60).toFixed(1)} min)
+                    </span>
+                  ) : (
+                    <span className="text-amber-200/90">Overdue (CLI can run inactivity path)</span>
+                  )}
+                </p>
+                {currentSlot != null && <p className="mt-1 text-[10px] text-white/32">Current slot: {currentSlot.toString()}</p>}
+              </div>
+            </div>
+          </div>
         )}
 
+        {/* —— After trip / disarmed: re-arm —— */}
         {st && !accountMissing && (st.tripped !== 'none' || !st.isArmed) && (
-          <div className="mt-3">
+          <div className="space-y-2 border-t border-white/[0.06] pt-4">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Monitoring</h3>
             <button
               type="button"
               data-testid="sovereign-rearm"
@@ -331,82 +383,88 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
                   return t;
                 })
               }
-              className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-[12px] text-sky-100/90 hover:bg-sky-500/15 disabled:opacity-50"
+              className="w-full rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-[12px] font-medium text-sky-100/90 hover:bg-sky-500/15 disabled:opacity-50"
             >
-              {busy === 'Re-arm' ? '…' : 'Re-arm (clears trip in state)'}
+              {busy === 'Re-arm' ? '…' : 'Re-arm (turn monitoring on)'}
             </button>
           </div>
         )}
 
+        {/* —— Armed, not tripped: day-to-day —— */}
         {st && !accountMissing && st.tripped === 'none' && st.isArmed && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              data-testid="sovereign-poke"
-              disabled={!canSign || busy !== null}
-              onClick={() =>
-                runTx('Heartbeat', (pid, o, s) => {
-                  const t = new Transaction();
-                  t.add(buildPokeInstruction(pid, o, s));
-                  return t;
-                })
-              }
-              className="rounded-xl bg-white/[0.08] px-3 py-2 text-[12px] font-medium text-white/90 ring-1 ring-white/12 hover:bg-white/[0.12] disabled:opacity-50"
-            >
-              {busy === 'Heartbeat' ? '…' : 'Poke (heartbeat)'}
-            </button>
-            <button
-              type="button"
-              data-testid="sovereign-disarm"
-              disabled={!canSign || busy !== null}
-              onClick={() =>
-                runTx('Disarm', (pid, o, s) => {
-                  const t = new Transaction();
-                  t.add(buildSetArmedInstruction(pid, o, s, false));
-                  return t;
-                })
-              }
-              className="rounded-xl border border-white/10 bg-transparent px-3 py-2 text-[12px] text-white/60 hover:bg-white/[0.04] disabled:opacity-50"
-            >
-              {busy === 'Disarm' ? '…' : 'Disarm'}
-            </button>
+          <div className="space-y-3 border-t border-white/[0.06] pt-4">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">While armed</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid="sovereign-poke"
+                disabled={!canSign || busy !== null}
+                onClick={() =>
+                  runTx('Heartbeat', (pid, o, s) => {
+                    const t = new Transaction();
+                    t.add(buildPokeInstruction(pid, o, s));
+                    return t;
+                  })
+                }
+                className="flex-1 min-w-[7rem] rounded-xl bg-white/[0.08] px-3 py-2.5 text-[12px] font-medium text-white/90 ring-1 ring-white/12 hover:bg-white/[0.12] disabled:opacity-50"
+              >
+                {busy === 'Heartbeat' ? '…' : 'Check in'}
+              </button>
+              <button
+                type="button"
+                data-testid="sovereign-disarm"
+                disabled={!canSign || busy !== null}
+                onClick={() =>
+                  runTx('Disarm', (pid, o, s) => {
+                    const t = new Transaction();
+                    t.add(buildSetArmedInstruction(pid, o, s, false));
+                    return t;
+                  })
+                }
+                className="flex-1 min-w-[7rem] rounded-xl border border-white/10 bg-transparent px-3 py-2.5 text-[12px] text-white/60 hover:bg-white/[0.04] disabled:opacity-50"
+              >
+                {busy === 'Disarm' ? '…' : 'Disarm'}
+              </button>
+            </div>
             {st.panicFloor > 0n && (
-              <div className="mt-2 flex w-full flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  data-testid="sovereign-attest-input"
-                  value={attestVal}
-                  onChange={(e) => setAttestVal(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Attested amount"
-                  className="min-w-[8rem] flex-1 rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1.5 text-[12px] text-white/90 placeholder:text-white/30"
-                />
-                <button
-                  type="button"
-                  data-testid="sovereign-attest"
-                  disabled={!canSign || busy !== null || !attestVal}
-                  onClick={() => {
-                    const n = BigInt(attestVal || '0');
-                    void runTx('Attest balance', (pid, o, s) => {
-                      const t = new Transaction();
-                      t.add(buildAttestBalanceInstruction(pid, o, s, n));
-                      return t;
-                    });
-                  }}
-                  className="rounded-xl bg-amber-500/20 px-3 py-2 text-[12px] text-amber-100/90 ring-1 ring-amber-400/25 disabled:opacity-50"
-                >
-                  {busy === 'Attest balance' ? '…' : 'Attest (demo)'}
-                </button>
+              <div className="space-y-2">
+                <p className="text-[10px] text-white/38">Optional — demo value for the balance floor</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    data-testid="sovereign-attest-input"
+                    value={attestVal}
+                    onChange={(e) => setAttestVal(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Amount"
+                    className="min-w-[8rem] flex-1 rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1.5 text-[12px] text-white/90 placeholder:text-white/30"
+                  />
+                  <button
+                    type="button"
+                    data-testid="sovereign-attest"
+                    disabled={!canSign || busy !== null || !attestVal}
+                    onClick={() => {
+                      const n = BigInt(attestVal || '0');
+                      void runTx('Attest balance', (pid, o, s) => {
+                        const t = new Transaction();
+                        t.add(buildAttestBalanceInstruction(pid, o, s, n));
+                        return t;
+                      });
+                    }}
+                    className="rounded-xl bg-amber-500/20 px-3 py-2 text-[12px] text-amber-100/90 ring-1 ring-amber-400/25 disabled:opacity-50"
+                  >
+                    {busy === 'Attest balance' ? '…' : 'Attest'}
+                  </button>
+                </div>
+                <p className="text-[10px] leading-relaxed text-white/32">
+                  Below the floor while armed, a separate CLI step can run the program&apos;s balance trap (see README).
+                </p>
               </div>
             )}
-            <p className="w-full text-[10px] text-white/32">
-              If attested amount is below your panic floor, anyone can run spring_panic (CLI) to move dWallet authority
-              to recovery.
-            </p>
           </div>
         )}
 
-        {err && <p className="mt-2 text-[11px] text-rose-300/90">{err}</p>}
+        {err && <p className="text-[11px] text-rose-300/90">{err}</p>}
       </div>
     </section>
   );

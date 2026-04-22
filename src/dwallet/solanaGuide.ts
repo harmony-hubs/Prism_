@@ -127,17 +127,33 @@ export const DWALLET_PRISM_CHECKLIST = [
   },
 ] as const;
 
-/** Short bullets for first-time visitors — wallet only (Learn is a separate screen). */
-export const PRISM_WELCOME_BULLETS = [
-  'Totals are devnet play-money — not a real balance.',
-  'Connect Phantom to show your Solana row; use Trade for Jupiter (real mainnet-style swaps).',
+/**
+ * Public positioning: production-quality vision. Network (devnet) is a footnote, not the story.
+ * Used in the hub welcome card and re-exported for comms; keep honest about preview / pre-alpha in footnotes.
+ */
+export const PRISM_VISION_LEDE =
+  "PRISM is a sovereign home for the next kind of multi-chain account: Ika dWallet program signing, optional private policy, and the wallet apps you already use in one flow. PRISM does not custody funds — it coordinates what you are allowed to sign and when.";
+
+export const PRISM_INDUSTRY_SHIFT =
+  "The industry default is fragmenting identity and routing every action through more bridges and more exposure. A policy layer on Solana can approve native signatures and eligibility checks without moving collateral across wrapped bridges — that is the architecture PRISM demonstrates.";
+
+export const PRISM_HOW_STEPS = [
+  "Connect Phantom to see your Solana line. Use Receive to copy an address, or Send for a short checklist in Phantom or a Sui wallet. Every transfer is signed in your extension — PRISM never pushes your money for you.",
+  "Open Ika & dWallet in Learn for the dWallet and MessageApproval operator path, or Trade (Jupiter) to swap. The confirmation pattern is the same as on any production wallet, without PRISM in the spend path.",
+  "Use Overview for automation and the demo policy gate, and flash a practice beam to exercise 2PC-MPC style signing (preview stack).",
 ] as const;
+
+export const PRISM_PREVIEW_FOOTNOTE =
+  "This public build uses Solana devnet and value-free assets so anyone can try it safely. Mainnet, full MPC, and the full policy stack follow the Ika and Encrypt roadmaps. Not a bank or brokerage; estimates only.";
 
 /** Plain-language gloss for jargon in the Learn tab and wallet UI. */
 export const PRISM_GLOSSARY = [
-  { term: 'Devnet', plain: 'A public test network. Coins are free play-money — no dollar value.' },
+  {
+    term: 'Preview network (devnet)',
+    plain: 'This release runs on a public value-free chain (e.g. Solana devnet) so demos are safe; the app surface is what we are shipping toward production.',
+  },
   { term: 'dWallet', plain: 'A signing key lives on-chain and can be controlled by your program, not only by a phone app.' },
   { term: 'Message approval', plain: 'An on-chain note that “this exact message was approved” so the network can attach a signature.' },
   { term: 'PDA', plain: 'A special Solana address computed from seeds and a program — no seed phrase in your notebook.' },
-  { term: 'Phantom', plain: 'A browser extension wallet many people use for Solana (like a card holder for devnet keys).' },
+  { term: 'Phantom', plain: 'A browser extension wallet many people use for Solana — the keys live in the extension, not in PRISM.' },
 ] as const;

@@ -1,7 +1,29 @@
 {
   "name": "prism",
   "version": "1.0.0",
-  "description": "PRISM — minimal multi-chain wallet experience (practice mode)",
+  "description": "PRISM — sovereign cross-chain identity: Ika dWallets, Encrypt policy gate, Solana + web operator UX (pre-alpha / devnet)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harmony-hubs/Prism_.git"
+  },
+  "bugs": {
+    "url": "https://github.com/harmony-hubs/Prism_/issues"
+  },
+  "keywords": [
+    "solana",
+    "ika",
+    "dwallet",
+    "d-wallet",
+    "mpc",
+    "encrypt",
+    "message-approval",
+    "prism",
+    "pinocchio"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "main": "src/app.tsx",
   "scripts": {
     "dev": "vite",

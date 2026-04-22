@@ -8,7 +8,10 @@ import {
   disconnectPhantomWallet,
   getInjectedSolana,
   IKA_SOLANA_PREALPHA_GUIDE,
-  PRISM_WELCOME_BULLETS,
+  PRISM_HOW_STEPS,
+  PRISM_INDUSTRY_SHIFT,
+  PRISM_PREVIEW_FOOTNOTE,
+  PRISM_VISION_LEDE,
   readConnectedPubkey,
 } from './dwallet';
 import { SovereignCommand } from './SovereignCommand';
@@ -185,6 +188,8 @@ export const Prism: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [receiveAsset, setReceiveAsset] = useState<'sol' | 'sui'>('sol');
+  const [sendHelpOpen, setSendHelpOpen] = useState(false);
+  const [sendHelpAsset, setSendHelpAsset] = useState<'sol' | 'sui'>('sol');
   const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity } | { kind: 'trade' }>(null);
   const [confettiOn, setConfettiOn] = useState(false);
   const [beamFlashOn, setBeamFlashOn] = useState(false);
@@ -389,11 +394,13 @@ export const Prism: React.FC = () => {
   const suiNum = suiMist !== null ? suiMist / 1e9 : 0;
   const totalUsdEst = solNum * SOL_USD_EST + suiNum * SUI_USD_EST;
   const balancesReady = solLamports !== null && suiMist !== null;
-  const quickPillFocus: 'receive' | 'chains' | 'activity' = receiveOpen
-    ? 'receive'
-    : walletTab === 'activity'
-      ? 'activity'
-      : 'chains';
+  const quickPillFocus: 'send' | 'receive' | 'chains' | 'activity' = sendHelpOpen
+    ? 'send'
+    : receiveOpen
+      ? 'receive'
+      : walletTab === 'activity'
+        ? 'activity'
+        : 'chains';
 
   if (phase === 'splash') {
     return (
@@ -415,7 +422,7 @@ export const Prism: React.FC = () => {
 
         <div className="relative z-10 flex min-h-dvh flex-col">
           <div className="flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-6 sm:px-8 sm:pb-16">
-            <p className="splash-kicker splash-rise mb-5 text-center">Multi-chain wallet</p>
+            <p className="splash-kicker splash-rise mb-5 text-center">Sovereign cross-chain control</p>
 
             <h1 className="splash-rise splash-rise-delay-1 font-serif text-[2.85rem] font-normal leading-none tracking-tight sm:text-7xl md:text-8xl">
               <span className="splash-title-track gold-glow inline-block bg-gradient-to-br from-white via-[#f8efd9] to-[#c9a227] bg-clip-text text-transparent">
@@ -436,6 +443,10 @@ export const Prism: React.FC = () => {
                 {' '}in a single beam.
               </p>
               <div className="mx-auto mt-5 h-px max-w-[12rem] bg-gradient-to-r from-transparent via-white/15 to-transparent" aria-hidden />
+              <p className="mx-auto mt-5 max-w-[22rem] text-center text-[11px] leading-relaxed text-white/38">
+                One policy layer, native-chain signatures, less bridge custody. This build runs on a public preview chain;
+                the product story is production-grade.
+              </p>
             </div>
 
             <div className="splash-rise splash-rise-delay-4 mt-11 flex w-full max-w-[320px] flex-col gap-3">
@@ -461,7 +472,7 @@ export const Prism: React.FC = () => {
           </div>
 
           <p className="splash-rise splash-rise-delay-5 px-4 pb-10 text-center text-[11px] tracking-wide text-white/28 sm:pb-12 sm:text-[12px]">
-            Hollow Identity · Sovereign Mode Active
+            Ika dWallets · Encrypt-class policy · Hollow Identity
           </p>
         </div>
       </div>
@@ -480,7 +491,7 @@ export const Prism: React.FC = () => {
           <div className="h-12 w-12 animate-spin rounded-full border-2 border-white/10 border-t-emerald-400/80" />
         </div>
         <p className="relative text-[15px] font-medium text-white/80">Revealing your spectrum…</p>
-        <p className="relative mt-2 text-[12px] text-white/35">One beam · test network</p>
+        <p className="relative mt-2 text-[12px] text-white/35">One beam · linking to the preview network</p>
       </div>
     );
   }
@@ -488,6 +499,7 @@ export const Prism: React.FC = () => {
   const solChain = chains.find((c) => c.id === 'sol');
   const suiChain = chains.find((c) => c.id === 'sui');
   const receiveChain = receiveAsset === 'sol' ? solChain : suiChain;
+  const sendHelpChain = sendHelpAsset === 'sol' ? solChain : suiChain;
 
   /* hub — wallet UI or separate Learn lab */
   return (
@@ -594,7 +606,7 @@ export const Prism: React.FC = () => {
                 </div>
                 <div>
                   <h1 className="text-[17px] font-semibold leading-tight tracking-tight">PRISM</h1>
-                  <p className="text-[11px] text-white/40">Your practice multi-chain pocket</p>
+                  <p className="text-[11px] text-white/40">One program, your chains — same flow we ship toward mainnet</p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1.5">
@@ -611,8 +623,12 @@ export const Prism: React.FC = () => {
                       ? `Solana · ${solWalletPk.slice(0, 4)}…${solWalletPk.slice(-4)}`
                       : 'Connect wallet'}
                 </button>
-                <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-400/90 ring-1 ring-emerald-500/20">
-                  Devnet
+                <span
+                  className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-400/90 ring-1 ring-emerald-500/20"
+                  data-testid="network-preview-badge"
+                  title="Solana devnet — value-free preview for this release"
+                >
+                  Preview
                 </span>
               </div>
             </header>
@@ -630,7 +646,7 @@ export const Prism: React.FC = () => {
               {balancesReady ? (
                 <p>
                   {formatCrypto(solNum, 4)} SOL · {formatCrypto(suiNum, 4)} SUI
-                  <span className="text-white/25"> — devnet demo</span>
+                  <span className="text-white/25"> — preview network, not mainnet funds</span>
                 </p>
               ) : (
                 'Loading…'
@@ -638,15 +654,30 @@ export const Prism: React.FC = () => {
             </div>
           </section>
 
-          <div className="wallet-pill-rail mt-5 flex items-stretch gap-1.5 rounded-full px-2 py-2 sm:gap-2 sm:px-3 sm:py-2">
+          <div className="wallet-pill-rail mt-5 flex flex-wrap items-stretch justify-center gap-1.5 rounded-[22px] px-2 py-2 sm:gap-2 sm:rounded-full sm:px-3 sm:py-2">
+            <button
+              type="button"
+              data-testid="quick-send"
+              onClick={() => {
+                setReceiveOpen(false);
+                setSendHelpAsset('sol');
+                setSendHelpOpen(true);
+              }}
+              className={`wallet-pill-segment min-w-[4.5rem] flex-1 rounded-full py-2.5 text-[12px] font-medium sm:min-w-0 sm:py-2 ${
+                quickPillFocus === 'send' ? 'wallet-pill-segment--active' : 'border border-transparent text-white/42 hover:text-white/85'
+              }`}
+            >
+              Send
+            </button>
             <button
               type="button"
               data-testid="quick-receive"
               onClick={() => {
+                setSendHelpOpen(false);
                 setReceiveAsset('sol');
                 setReceiveOpen(true);
               }}
-              className={`wallet-pill-segment flex-1 rounded-full py-2.5 text-[12px] font-medium sm:py-2 ${
+              className={`wallet-pill-segment min-w-[4.5rem] flex-1 rounded-full py-2.5 text-[12px] font-medium sm:min-w-0 sm:py-2 ${
                 quickPillFocus === 'receive' ? 'wallet-pill-segment--active' : 'border border-transparent text-white/42 hover:text-white/85'
               }`}
             >
@@ -656,6 +687,8 @@ export const Prism: React.FC = () => {
               type="button"
               data-testid="quick-portfolio"
               onClick={() => {
+                setSendHelpOpen(false);
+                setReceiveOpen(false);
                 setWalletTab('assets');
                 pushActivity('Opened portfolio');
               }}
@@ -668,7 +701,11 @@ export const Prism: React.FC = () => {
             <button
               type="button"
               data-testid="quick-activity"
-              onClick={() => setWalletTab('activity')}
+              onClick={() => {
+                setSendHelpOpen(false);
+                setReceiveOpen(false);
+                setWalletTab('activity');
+              }}
               className={`wallet-pill-segment flex-1 rounded-full py-2.5 text-[12px] font-medium sm:py-2 ${
                 quickPillFocus === 'activity' ? 'wallet-pill-segment--active' : 'border border-transparent text-white/42 hover:text-white/85'
               }`}
@@ -719,7 +756,7 @@ export const Prism: React.FC = () => {
               className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4"
             >
               <div className="flex items-start justify-between gap-2">
-                <h2 className="text-[13px] font-medium text-white/80">First time here?</h2>
+                <h2 className="text-[13px] font-medium text-white/80">Start here</h2>
                 <button
                   type="button"
                   onClick={dismissWelcome}
@@ -728,11 +765,22 @@ export const Prism: React.FC = () => {
                   Dismiss
                 </button>
               </div>
-              <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] leading-relaxed text-white/45 marker:text-white/30">
-                {PRISM_WELCOME_BULLETS.map((line) => (
+              <p
+                data-testid="hub-welcome-lede"
+                className="mt-2 text-[12px] leading-relaxed text-white/55"
+              >
+                {PRISM_VISION_LEDE}
+              </p>
+              <p className="mt-2.5 text-[12px] leading-relaxed text-white/42">{PRISM_INDUSTRY_SHIFT}</p>
+              <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/32">
+                How to use it
+              </p>
+              <ol className="mt-1.5 list-decimal space-y-1.5 pl-4 text-[12px] leading-relaxed text-white/50 marker:text-amber-400/70">
+                {PRISM_HOW_STEPS.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
-              </ul>
+              </ol>
+              <p className="mt-3 text-[10px] leading-relaxed text-white/32">{PRISM_PREVIEW_FOOTNOTE}</p>
             </section>
           )}
 
@@ -824,7 +872,9 @@ export const Prism: React.FC = () => {
                 );
               })}
               <p className="px-1 pt-2 text-center text-[11px] leading-relaxed text-white/32">
-                Each row is a color in the beam — expand to copy or flash a practice beam
+                Expand a row to copy the address. To <span className="text-white/50">send</span> preview (devnet) coins, use
+                the <span className="text-white/50">Send</span> action in the quick bar (checklist in Phantom / Sui). Flash beam
+                is signing practice, not a transfer.
               </p>
             </div>
           )}
@@ -885,7 +935,7 @@ export const Prism: React.FC = () => {
               dWallet book
             </a>
             <span> · </span>
-            <span className="font-serif">devnet</span>
+            <span className="font-serif">Preview · Solana devnet</span>
           </p>
         </footer>
           </>
@@ -923,15 +973,105 @@ export const Prism: React.FC = () => {
           onApprove={onSignatureApprovalConfirm}
           contextLine={
             sigApproval.kind === 'chain'
-              ? `${sigApproval.chain.name} · ${sigApproval.chain.symbol} — practice path`
-              : 'Jupiter · live swap (devnet) — plugin will ask for your wallet after this sheet'
+              ? `${sigApproval.chain.name} · ${sigApproval.chain.symbol} — Ika dWallet path (preview network)`
+              : 'Jupiter — live swap; wallet signs after you confirm (preview network in this build)'
           }
           processLine={
             sigApproval.kind === 'chain'
-              ? '2PC-MPC · Ika dWallet MessageApproval (devnet practice)'
-              : '2PC-MPC · route attestation (devnet practice)'
+              ? '2PC-MPC · Ika dWallet MessageApproval (pre-alpha / preview — see Learn disclaimer)'
+              : '2PC-MPC · route attestation (preview — same flow at mainnet launch)'
           }
         />
+      )}
+
+      {sendHelpOpen && sendHelpChain && (
+        <div
+          className="fixed inset-0 z-50 flex max-h-dvh items-end justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:items-center"
+          role="dialog"
+          aria-modal
+          data-testid="send-help-modal"
+          onClick={() => setSendHelpOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setSendHelpOpen(false)}
+        >
+          <div
+            className="my-auto w-full max-w-md rounded-[28px] bg-gradient-to-b from-zinc-900/98 to-[#0f0f14] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_24px_64px_rgba(0,0,0,0.5)] ring-1 ring-white/10 backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Send (how it works)</p>
+            <p className="mt-2 text-center text-[12px] leading-snug text-white/45">
+              PRISM does <span className="text-white/70">not</span> run transfers for you. You send from your own wallet (Phantom, Sui
+              wallet, or similar). The address below is where preview-network {sendHelpAsset === 'sol' ? 'SOL' : 'SUI'} would leave if
+              you send from the account in your extension — same steps you would use on mainnet, on value-free test assets here.
+            </p>
+            <div className="mt-4 flex rounded-xl bg-black/40 p-1 ring-1 ring-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setSendHelpAsset('sol')}
+                className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+                  sendHelpAsset === 'sol' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+                }`}
+              >
+                SOL
+              </button>
+              <button
+                type="button"
+                onClick={() => setSendHelpAsset('sui')}
+                className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+                  sendHelpAsset === 'sui' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'
+                }`}
+              >
+                SUI
+              </button>
+            </div>
+            <p className="mt-2 text-center text-[11px] text-white/35">
+              {sendHelpAsset === 'sol' ? 'Solana devnet (preview chain)' : 'Sui devnet (preview chain)'}
+            </p>
+            <div className="mt-3 rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/[0.06]">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-white/38">From address (copy for reference)</p>
+              <p className="mt-1.5 break-all font-mono text-[11px] leading-relaxed text-white/60">{sendHelpChain.address}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  const key = sendHelpAsset === 'sol' ? 'send-help-sol' : 'send-help-sui';
+                  copy(key, sendHelpChain.address);
+                }}
+                className="mt-2 w-full rounded-lg bg-white/[0.08] py-2 text-[12px] font-medium text-white/85"
+              >
+                {copied === (sendHelpAsset === 'sol' ? 'send-help-sol' : 'send-help-sui') ? 'Copied' : 'Copy this address'}
+              </button>
+            </div>
+            {sendHelpAsset === 'sol' ? (
+              <ol className="mt-4 list-decimal space-y-2 pl-4 text-[11px] leading-relaxed text-white/50 marker:text-violet-400/80">
+                <li>Open the <span className="text-white/70">Phantom</span> extension in this browser (or the Phantom app on your phone, same wallet).</li>
+                <li>Check the network is <span className="text-white/70">Devnet</span> in Phantom for this public preview (not mainnet).</li>
+                <li>Choose <span className="text-white/70">Send</span> / <span className="text-white/70">Send SOL</span>.</li>
+                <li>Paste the <span className="text-white/70">recipient’s</span> address, enter the amount, then confirm the transaction in Phantom.</li>
+              </ol>
+            ) : (
+              <ol className="mt-4 list-decimal space-y-2 pl-4 text-[11px] leading-relaxed text-white/50 marker:text-amber-400/80">
+                <li>
+                  Open the <span className="text-white/70">Sui Wallet</span> (browser extension) or the mobile app that holds this
+                  address.
+                </li>
+                <li>Use <span className="text-white/70">devnet / testnet</span> in settings if your wallet has a network switch.</li>
+                <li>
+                  Tap <span className="text-white/70">Send</span>, choose SUI, paste the <span className="text-white/70">recipient</span>
+                  , confirm.
+                </li>
+              </ol>
+            )}
+            <p className="mt-3 text-center text-[10px] leading-relaxed text-white/32">
+              Need test assets? Use a public devnet faucet for SUI or SOL, then try a tiny send to a friend on the preview network.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSendHelpOpen(false)}
+              className="mt-4 w-full py-3 text-[14px] font-medium text-white/45"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {receiveOpen && receiveChain && (
@@ -948,7 +1088,9 @@ export const Prism: React.FC = () => {
           >
             <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Receive</p>
             <p className="mt-2 text-center text-[12px] leading-snug text-white/45">
-              Share this address if you want someone to send you <span className="text-white/60">test</span> coins on devnet
+              Share this address to receive <span className="text-white/60">value-free</span> preview coins on the devnet
+              (not mainnet). To pay someone, use your wallet’s <span className="text-white/60">Send</span>, or open{' '}
+              <span className="text-white/60">Send</span> in the quick bar for a short checklist in Phantom or Sui.
             </p>
             <div className="mt-4 flex rounded-xl bg-black/40 p-1 ring-1 ring-white/[0.06]">
               <button
@@ -971,7 +1113,7 @@ export const Prism: React.FC = () => {
               </button>
             </div>
             <p className="mt-2 text-center text-[11px] text-white/35">
-              {receiveAsset === 'sol' ? 'Solana devnet' : 'Sui devnet'}
+              {receiveAsset === 'sol' ? 'Solana devnet (preview)' : 'Sui devnet (preview)'}
             </p>
             <p className="mt-4 break-all text-center font-mono text-[12px] leading-relaxed text-white/70">{receiveChain.address}</p>
             <button

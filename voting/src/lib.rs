@@ -1,4 +1,6 @@
 #![no_std]
+//! Example `prism-voting` program — dWallet + message-hash patterns on Solana, separate from the main PRISM controller.
+//! For Ika dWallet flow details see `program/src/lib.rs` and the [Ika book](https://solana-pre-alpha.ika.xyz/print.html).
 extern crate alloc;
 
 use ika_dwallet_pinocchio::{CPI_AUTHORITY_SEED, DWalletContext};

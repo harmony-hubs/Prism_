@@ -1,12 +1,31 @@
 # PRISM — Sovereign command for cross-chain identity and private policy
 
+[![CI](https://github.com/harmony-hubs/Prism_/actions/workflows/ci.yml/badge.svg)](https://github.com/harmony-hubs/Prism_/actions/workflows/ci.yml)
+
 **One identity. Every chain. Nothing exposed.**
 
-Public repo: **[github.com/harmony-hubs/Prism](https://github.com/harmony-hubs/Prism)** (this codebase).
+Public repo: **[github.com/harmony-hubs/Prism_](https://github.com/harmony-hubs/Prism_)** (MIT).
 
 **[Colosseum Frontier 2026](https://colosseum.com/frontier)** — **Encrypt & Ika** track · [Superteam — Bridgeless & encrypted capital markets](https://superteam.fun/earn/listing/encrypt-ika-frontier-april-2026)
 
-PRISM is a **Sovereign Command Center** for cross-chain identity: a **Solana controller** + **operator UX** that use **Ika** (2PC-MPC **dWallets** on Solana) for bridgeless `approve_message` / **MessageApproval** flows, and **Encrypt**-shaped **policy gating** (on-chain eligibility before that CPI).  
+PRISM is a **Sovereign Command Center** for cross-chain identity. It pairs a **Solana controller** with **operator UX** and uses **Ika** (2PC-MPC **dWallets** on Solana) for bridgeless `approve_message` / **MessageApproval** flows, plus **Encrypt**-shaped **policy gating** (on-chain eligibility before that CPI).
+
+### At a glance (Ika / reviewers)
+
+| You want… | Start here |
+|-----------|------------|
+| **Book alignment** | Same high-level path as the [dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/): **create dWallet → CPI authority to your program → `approve_message` → MessageApproval**. See **Ika docs ↔ this repo** below. |
+| **On-chain CPI** | `program/src/lib.rs` — `approve_action` / `approve_action_gated` CPI to the Ika dWallet program; CPI PDA = `find_program_address(["__ika_cpi_authority"], PRISM_PROGRAM_ID)`. |
+| **Off-chain + gRPC** | `client/` — `prism` CLI (`create`, `sign`, `policy-*`, `status`). Needs **`protoc`** on `PATH` to build (see **How to run**). |
+| **Operator UI** | `npm install && npm start` → **Learn** → Operator console (`src/DWalletTools.tsx`) + on-chain helpers in `src/dwallet/`. |
+| **Pre-alpha defaults** | Ika gRPC + devnet dWallet program id are documented in **Pre-alpha environment**; do not use real funds per Ika’s disclaimer. |
+
+### Product story (demos, press, and first-time users)
+
+- **What it is:** a single app surface where users keep their normal wallets, while your **policy program** (plus optional Encrypt direction) can approve **Ika dWallet** signatures and native-chain message approvals without PRISM or a bridge **custodying** user funds.  
+- **What you do in the app:** connect Phantom, use **Send / Receive** (wallet-signed transfers), open **Learn** for the dWallet + operator path, or **Trade** (Jupiter) with the same confirm pattern as in production.  
+- **Why it matters for the industry:** the default is fragmented keys and more bridge **surface area**. A controller on Solana that approves **native** signatures and private eligibility is a path to **less bridge custody** and clearer user intent.  
+- **This repo’s chain:** the web build targets **Solana devnet** (value-free) so the flow is safe to show publicly; the **UI and product narrative** are written as if the same app ships after mainnet — devnet is implementation detail, not the headline.
 
 ---
 
@@ -37,7 +56,7 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                          PRISM                            │
+│                           PRISM                            │
 │  ┌─────────────┐  ┌──────────────────┐  ┌──────────────┐  │
 │  │ Web (Vite)  │  │ PRISM on-chain  │  │ Rust CLI     │  │
 │  │ + Phantom   │  │ Pinocchio +     │  │ (gRPC + RPC)  │  │
@@ -223,6 +242,12 @@ CPI PDA: `find_program_address(["__ika_cpi_authority"], YOUR_PRISM_PROGRAM_ID)` 
 - **Ika:** on-chain **CPI** to **your** controller + **MessageApproval**-aligned **CLI** and **Operator UI**.  
 - **Encrypt:** **Composable gate** in front of the **same** Ika CPI; roadmap to **real Encrypt** driving eligibility.  
 - **UX + proof:** one shell for **dWallet** education, **Sovereign** devnet tools, and optional **Jupiter** live trading — with clear **pre-alpha** disclaimers.
+
+---
+
+## License
+
+[MIT](LICENSE)
 
 ---
 

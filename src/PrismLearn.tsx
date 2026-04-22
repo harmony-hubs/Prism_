@@ -31,8 +31,10 @@ export const PrismLearn: React.FC<{ connection: Connection }> = ({ connection })
       className="flex flex-col gap-4 px-4 pb-8 pt-2 sm:px-5"
     >
       <p className="text-[12px] leading-relaxed text-white/65">
-        <span className="font-semibold text-white/85">Builder lab.</span> Everything here is optional background: Ika
-        pre-alpha, Encrypt, and the PRISM on-chain program. Your wallet screen stays clean — this is the appendix.
+        <span className="font-semibold text-white/85">The deep dive.</span> The hub is the public face of PRISM; this tab is
+        the operator and builder appendix — Ika pre-alpha, Encrypt-shaped hooks, and the on-chain program. The story on the
+        wallet screen is the same product you would teach at a mainnet launch; the stack here is the honest preview
+        implementation and disclaimers.
       </p>
       <p className="text-[11px] leading-relaxed text-amber-200/70">{PRE_ALPHA_DISCLAIMER_SHORT}</p>
 
