@@ -1,5 +1,7 @@
 # Agent notes — Ika dWallet + PRISM
 
+**Stack truth (Solana dWallet vs Sui SDK):** [IKA_INTEGRATION.md](IKA_INTEGRATION.md).
+
 This file maps **Ika book steps** and **CLI** behavior to paths in this repo (for reviewers and agents).
 
 Use it when the user asks how to **run the dWallet flow**, **`prism` CLI** (`prism-client`), or **Operator console** checks in PRISM.

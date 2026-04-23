@@ -85,7 +85,7 @@ export const SignatureApprovalModal: React.FC<SignatureApprovalModalProps> = ({
       <div className="approval-modal" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-300/80">Sovereign Command</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-300/80">PRISM Command</p>
             <h2 id="sig-approval-title" className="mt-1 text-lg font-bold tracking-tight text-white/95 sm:text-xl">
               {mpcSyncing ? 'Awaiting signature' : 'Review & approve'}
             </h2>

@@ -14,6 +14,7 @@ import {
   PRISM_VISION_LEDE,
   readConnectedPubkey,
 } from './dwallet';
+import { PrismGlyph } from './PrismGlyph';
 import { SovereignCommand } from './SovereignCommand';
 import { SignatureApprovalModal } from './SignatureApprovalModal';
 
@@ -402,6 +403,9 @@ export const Prism: React.FC = () => {
         ? 'activity'
         : 'chains';
 
+  /** Flash beam / sovereign signature modal — drives PRISM glyph “signing” state */
+  const prismGlyphSigning = Boolean(sigApproval) || signingId !== null;
+
   if (phase === 'splash') {
     return (
       <div className="relative min-h-dvh overflow-hidden text-white">
@@ -654,6 +658,24 @@ export const Prism: React.FC = () => {
             </div>
           </section>
 
+          <button
+            type="button"
+            data-testid="open-command-center"
+            onClick={() => setHubMode('command')}
+            className="group mt-3 flex w-full max-w-[16rem] flex-col items-center rounded-2xl py-1 text-center transition active:scale-[0.99]"
+            aria-label="Open command overview — full-screen identity readout"
+          >
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">PRISM command</p>
+            <div className="relative transition duration-300 group-hover:opacity-95 group-focus-visible:ring-2 group-focus-visible:ring-violet-400/40 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-zinc-950 rounded-full">
+              <PrismGlyph
+                size={148}
+                isSigning={prismGlyphSigning}
+                className="pointer-events-none shrink-0 select-none"
+              />
+            </div>
+            <p className="mt-1.5 max-w-[14rem] text-[10px] leading-snug text-white/28">Tap the prism for overview — controls stay below</p>
+          </button>
+
           <div className="wallet-pill-rail mt-5 flex flex-wrap items-stretch justify-center gap-1.5 rounded-[22px] px-2 py-2 sm:gap-2 sm:rounded-full sm:px-3 sm:py-2">
             <button
               type="button"
@@ -714,13 +736,14 @@ export const Prism: React.FC = () => {
             </button>
           </div>
 
-            <div className="mt-3 flex items-center justify-center gap-1 text-[12px] text-white/35">
-              <button type="button" data-testid="open-learn-lab" onClick={() => setHubMode('learn')} className="px-2 py-1 underline decoration-white/15 underline-offset-2 hover:text-white/55">
+            <div className="mt-3 flex justify-center text-[12px] text-white/35">
+              <button
+                type="button"
+                data-testid="open-learn-lab"
+                onClick={() => setHubMode('learn')}
+                className="px-2 py-1 underline decoration-white/15 underline-offset-2 hover:text-white/55"
+              >
                 Ika &amp; dWallet
-              </button>
-              <span className="text-white/20">·</span>
-              <button type="button" data-testid="open-command-center" onClick={() => setHubMode('command')} className="px-2 py-1 underline decoration-white/15 underline-offset-2 hover:text-white/55">
-                Overview
               </button>
             </div>
 
@@ -864,7 +887,7 @@ export const Prism: React.FC = () => {
                           </button>
                         </div>
                         <p className="text-[10px] leading-relaxed text-white/38">
-                          Opens the Sovereign signature sheet (2PC-MPC practice) before the beam.
+                          Opens the command signature sheet (2PC-MPC practice) before the beam.
                         </p>
                       </div>
                     )}
@@ -928,7 +951,7 @@ export const Prism: React.FC = () => {
 
         <footer className="prism-engraving mt-auto space-y-2 px-4 pb-10 pt-2 text-center">
           <p className="prism-hollow-line text-[10px] font-normal leading-relaxed tracking-[0.12em] sm:text-[11px]">
-            Hollow Identity · sovereign mode
+            Hollow Identity · PRISM command
           </p>
           <p className="prism-hollow-line text-[9px] tracking-[0.18em] sm:text-[10px]">
             <a href={IKA_SOLANA_PREALPHA_GUIDE} target="_blank" rel="noopener noreferrer" className="font-serif not-italic">

@@ -20,6 +20,8 @@ PRISM is a **Sovereign Command Center** for cross-chain identity. It pairs a **S
 | **Operator UI** | `npm install && npm start` → **Learn** → Operator console (`src/DWalletTools.tsx`) + on-chain helpers in `src/dwallet/`. |
 | **Pre-alpha defaults** | Ika gRPC + devnet dWallet program id are documented in **Pre-alpha environment**; do not use real funds per Ika’s disclaimer. |
 
+**Internal Ika stack (Solana vs Sui SDK):** see **[IKA_INTEGRATION.md](IKA_INTEGRATION.md)** before adding TS snippets or new flows.
+
 ### Product story (demos, press, and first-time users)
 
 - **What it is:** a single app surface where users keep their normal wallets, while your **policy program** (plus optional Encrypt direction) can approve **Ika dWallet** signatures and native-chain message approvals without PRISM or a bridge **custodying** user funds.  
@@ -94,6 +96,7 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 ├── e2e/                     # Playwright (splash → hub → dWallet lab)
 ├── move/                    # Sui — `prism.move` (vision / reference; not required for Solana)
 ├── scripts/                 # e.g. `prism-sign.ps1`, SBF build helpers
+├── IKA_INTEGRATION.md        # Ika: Pinocchio + gRPC vs `@ika.xyz/sdk` (Sui) — read first
 ├── index.html
 ├── package.json
 ├── playwright.config.ts

@@ -154,7 +154,7 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
   if (!PRISM_PROGRAM_ID?.trim()) {
     return (
       <section data-testid="sovereign-panel" className={sectionShell}>
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Command center</h2>
         <details className="mt-2 group rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-1.5">
           <summary className="cursor-pointer list-none text-[10px] text-white/40 outline-none transition hover:text-white/60 [&::-webkit-details-marker]:hidden">
             <span className="tracking-wide">Environment (devnet)</span>
@@ -171,7 +171,7 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
   if (!programId) {
     return (
       <section data-testid="sovereign-panel" className={`${sectionShell} ring-amber-500/20`}>
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Command center</h2>
         <p className="mt-1 text-[11px] text-amber-200/85">
           <code className="font-mono">VITE_PRISM_PROGRAM_ID</code> is not a valid Solana address. Fix <code className="font-mono">.env</code> and
           restart the dev server.
@@ -183,7 +183,7 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
   if (!ownerBase58?.trim()) {
     return (
       <section data-testid="sovereign-panel" className={sectionShell}>
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Command center</h2>
         <p className="mt-1.5 text-[12px] leading-relaxed text-white/45">
           Connect Solana to use this devnet demo: a small on-chain “watch” for inactivity and (optional) a demo balance
           floor, backed by your PRISM program.
@@ -195,7 +195,7 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
   if (!owner) {
     return (
       <section data-testid="sovereign-panel" className={`${sectionShell} ring-amber-500/20`}>
-        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Sovereign</h2>
+        <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white/90">Command center</h2>
         <p className="mt-1 text-[11px] text-amber-200/80">Connected address is not valid base58. Disconnect and reconnect your wallet.</p>
       </section>
     );
@@ -221,7 +221,7 @@ export const SovereignCommand: React.FC<Props> = ({ connection, ownerBase58 }) =
         {/* —— Intro —— */}
         <header className="space-y-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">On-chain (devnet)</p>
-          <h2 className="text-[15px] font-semibold tracking-tight text-white/92">Sovereign</h2>
+          <h2 className="text-[15px] font-semibold tracking-tight text-white/92">Command center</h2>
           <p className="text-[11px] leading-relaxed text-white/45">
             One PDA on your program keeps demo timers: while <span className="text-white/70">armed</span>, a periodic check-in
             and optional attested value can trigger <span className="text-white/70">traps</span> (inactivity or balance, per

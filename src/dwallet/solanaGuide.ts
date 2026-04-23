@@ -140,7 +140,7 @@ export const PRISM_INDUSTRY_SHIFT =
 export const PRISM_HOW_STEPS = [
   "Connect Phantom to see your Solana line. Use Receive to copy an address, or Send for a short checklist in Phantom or a Sui wallet. Every transfer is signed in your extension — PRISM never pushes your money for you.",
   "Open Ika & dWallet in Learn for the dWallet and MessageApproval operator path, or Trade (Jupiter) to swap. The confirmation pattern is the same as on any production wallet, without PRISM in the spend path.",
-  "Use Overview for automation and the demo policy gate, and flash a practice beam to exercise 2PC-MPC style signing (preview stack).",
+  "Use Command center (below) for automation and the demo policy gate, or tap the prism above for the full-screen overview — flash a practice beam to exercise 2PC-MPC style signing (preview stack).",
 ] as const;
 
 export const PRISM_PREVIEW_FOOTNOTE =

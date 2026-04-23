@@ -1,4 +1,5 @@
 import React from 'react';
+import { PrismGlyph } from './PrismGlyph';
 
 export type PrismDashboardProps = {
   networkLabel?: string;
@@ -33,9 +34,12 @@ export const PrismDashboard: React.FC<PrismDashboardProps> = ({
       )}
 
       <div className="mx-auto max-w-md">
-        <h1 className="text-lg font-medium tracking-tight">Overview</h1>
-        <p className="mt-1 text-[13px] leading-relaxed text-white/40">
-          Same app as the pocket view — this screen is a quiet read of demo identity rows.{' '}
+        <div className="flex flex-col items-center">
+          <PrismGlyph size={100} isSigning={false} className="mb-3 opacity-90" />
+          <h1 className="text-lg font-medium tracking-tight">Command overview</h1>
+        </div>
+        <p className="mt-1 text-center text-[13px] leading-relaxed text-white/40">
+          Same app as the pocket view — quiet read of demo identity rows.{' '}
           <span className="text-white/50">{networkLabel}</span>
         </p>
 

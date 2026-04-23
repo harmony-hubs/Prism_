@@ -187,7 +187,7 @@ test.describe('Sovereign Command Center — full motions (mocked chain)', () => 
     await test.step('Sovereign panel visible; initialize', async () => {
       const panel = page.getByTestId('sovereign-panel');
       await expect(panel).toBeVisible();
-      await expect(panel.getByRole('heading', { name: 'Sovereign' })).toBeVisible();
+      await expect(panel.getByRole('heading', { name: 'Command center' })).toBeVisible();
       await page.getByTestId('sovereign-init').click();
       await expect(page.getByTestId('sovereign-status')).toBeVisible({ timeout: 10_000 });
       await expect(page.getByTestId('sovereign-status')).toContainText(/Armed & checked in/i);
