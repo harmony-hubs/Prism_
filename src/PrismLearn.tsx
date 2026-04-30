@@ -8,6 +8,8 @@ import {
   SOLANA_RPC,
 } from './config';
 import {
+  DWALLET_AUTHORITY_FRAMING_ATTRIBUTION,
+  DWALLET_AUTHORITY_FRAMING_SEGMENTS,
   DWALLET_BOOK_PARTS,
   DWALLET_FLOW_STEPS,
   DWALLET_PRISM_CHECKLIST,
@@ -62,6 +64,66 @@ export const PrismLearn: React.FC<{ connection: Connection }> = ({ connection })
           </dl>
         )}
       </div>
+
+      <section
+        data-testid="dwallet-authority-framing"
+        className="rounded-2xl bg-gradient-to-b from-cyan-500/[0.07] to-transparent p-3 ring-1 ring-cyan-500/18"
+      >
+        <p className="text-[10px] leading-snug text-white/35" data-testid="dwallet-authority-attribution">
+          <span className="font-medium uppercase tracking-[0.12em] text-white/45">Source </span>
+          ·{' '}
+          <a
+            href={DWALLET_AUTHORITY_FRAMING_ATTRIBUTION.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-200/75 underline decoration-white/15 underline-offset-2"
+          >
+            {DWALLET_AUTHORITY_FRAMING_ATTRIBUTION.source}
+          </a>{' '}
+          — {DWALLET_AUTHORITY_FRAMING_ATTRIBUTION.note}
+        </p>
+        {DWALLET_AUTHORITY_FRAMING_SEGMENTS.map((seg, i) => {
+          switch (seg.kind) {
+            case 'h1':
+              return (
+                <h2 key={i} className="mt-2 text-[15px] font-semibold tracking-tight text-white/95">
+                  {seg.text}
+                </h2>
+              );
+            case 'h2':
+              return (
+                <p key={i} className="mt-1 text-[13px] font-semibold text-cyan-200/90">
+                  {seg.text}
+                </p>
+              );
+            case 'h3':
+              return (
+                <h3 key={i} className="mt-4 text-[12px] font-semibold tracking-tight text-cyan-200/88">
+                  {seg.text}
+                </h3>
+              );
+            case 'p':
+              return (
+                <p key={i} className="mt-2 text-[11px] leading-relaxed text-white/58">
+                  {seg.text}
+                </p>
+              );
+            case 'ul':
+              return (
+                <ul
+                  key={i}
+                  className="mt-2 list-disc space-y-1.5 pl-4 text-[11px] leading-relaxed text-white/58"
+                >
+                  {seg.items.map((item, j) => (
+                    <li key={j}>{item}</li>
+                  ))}
+                </ul>
+              );
+            default:
+              return null;
+          }
+        })}
+      </section>
 
       <section
         data-testid="ika-encrypt-pitch"

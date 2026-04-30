@@ -22,10 +22,6 @@ const PrismLearn = React.lazy(async () => {
   const m = await import('./PrismLearn');
   return { default: m.PrismLearn };
 });
-const PrismTrade = React.lazy(async () => {
-  const m = await import('./PrismTrade');
-  return { default: m.PrismTrade };
-});
 const PrismDashboard = React.lazy(async () => {
   const m = await import('./PrismDashboard');
   return { default: m.PrismDashboard };
@@ -185,13 +181,13 @@ export const Prism: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [justSigned, setJustSigned] = useState<string | null>(null);
   const [walletTab, setWalletTab] = useState<'assets' | 'activity'>('assets');
-  const [hubMode, setHubMode] = useState<'wallet' | 'learn' | 'trade' | 'command'>('wallet');
+  const [hubMode, setHubMode] = useState<'wallet' | 'learn' | 'command'>('wallet');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [receiveAsset, setReceiveAsset] = useState<'sol' | 'sui'>('sol');
   const [sendHelpOpen, setSendHelpOpen] = useState(false);
   const [sendHelpAsset, setSendHelpAsset] = useState<'sol' | 'sui'>('sol');
-  const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity } | { kind: 'trade' }>(null);
+  const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity }>(null);
   const [confettiOn, setConfettiOn] = useState(false);
   const [beamFlashOn, setBeamFlashOn] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
@@ -383,11 +379,7 @@ export const Prism: React.FC = () => {
 
   const onSignatureApprovalConfirm = useCallback(async () => {
     if (!sigApproval) return;
-    if (sigApproval.kind === 'chain') {
-      await handleTry(sigApproval.chain);
-    } else {
-      setHubMode('trade');
-    }
+    await handleTry(sigApproval.chain);
     setSigApproval(null);
   }, [sigApproval, handleTry]);
 
@@ -426,7 +418,7 @@ export const Prism: React.FC = () => {
 
         <div className="relative z-10 flex min-h-dvh flex-col">
           <div className="flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-6 sm:px-8 sm:pb-16">
-            <p className="splash-kicker splash-rise mb-5 text-center">Sovereign cross-chain control</p>
+            <p className="splash-kicker splash-rise mb-5 text-center">Programmable asset authority</p>
 
             <h1 className="splash-rise splash-rise-delay-1 font-serif text-[2.85rem] font-normal leading-none tracking-tight sm:text-7xl md:text-8xl">
               <span className="splash-title-track gold-glow inline-block bg-gradient-to-br from-white via-[#f8efd9] to-[#c9a227] bg-clip-text text-transparent">
@@ -448,8 +440,8 @@ export const Prism: React.FC = () => {
               </p>
               <div className="mx-auto mt-5 h-px max-w-[12rem] bg-gradient-to-r from-transparent via-white/15 to-transparent" aria-hidden />
               <p className="mx-auto mt-5 max-w-[22rem] text-center text-[11px] leading-relaxed text-white/38">
-                One policy layer, native-chain signatures, less bridge custody. This build runs on a public preview chain;
-                the product story is production-grade.
+                A Solana program decides what should be signed; the destination chain receives the native transaction.
+                This build runs on a public preview chain; the product story is production-grade.
               </p>
             </div>
 
@@ -561,43 +553,6 @@ export const Prism: React.FC = () => {
               onBack={() => setHubMode('wallet')}
             />
           </Suspense>
-        ) : hubMode === 'trade' ? (
-          <>
-            <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.06] bg-[#0b0b0f]/90 px-3 py-3 backdrop-blur-md">
-              <button
-                type="button"
-                data-testid="trade-back"
-                onClick={() => setHubMode('wallet')}
-                className="rounded-xl bg-white/[0.08] px-3 py-2 text-[12px] font-semibold text-white/90 ring-1 ring-white/10 hover:bg-white/[0.12]"
-              >
-                ← Wallet
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold text-white/90">Split the beam</p>
-                <p className="truncate text-[10px] text-white/40">Live swap · future beam agents</p>
-              </div>
-            </header>
-            <main className="flex max-h-[calc(100dvh-56px)] flex-1 flex-col overflow-y-auto">
-              <Suspense
-                fallback={
-                  <div className="flex min-h-[40vh] items-center justify-center text-[12px] text-white/40">
-                    Loading trade…
-                  </div>
-                }
-              >
-                <PrismTrade />
-              </Suspense>
-            </main>
-            <footer className="px-4 pb-4 pt-1 text-center text-[10px] text-white/25">
-              <button
-                type="button"
-                onClick={() => setHubMode('wallet')}
-                className="text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/55"
-              >
-                Back to wallet
-              </button>
-            </footer>
-          </>
         ) : (
           <>
             <header className="flex items-center justify-between border-b border-white/[0.06] px-4 pb-3 pt-3">
@@ -937,16 +892,6 @@ export const Prism: React.FC = () => {
             </div>
           )}
 
-            <div className="mt-auto w-full border-t border-white/[0.06] pt-5">
-              <button
-                type="button"
-                data-testid="open-trade-beam"
-                onClick={() => setSigApproval({ kind: 'trade' })}
-                className="w-full rounded-2xl bg-gradient-to-r from-amber-500/20 via-violet-500/20 to-cyan-500/15 py-3.5 text-[13px] font-semibold text-white ring-1 ring-white/12 transition duration-300 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]"
-              >
-                Trade (Jupiter)
-              </button>
-            </div>
         </main>
 
         <footer className="prism-engraving mt-auto space-y-2 px-4 pb-10 pt-2 text-center">
@@ -994,16 +939,8 @@ export const Prism: React.FC = () => {
           isOpen
           onClose={() => setSigApproval(null)}
           onApprove={onSignatureApprovalConfirm}
-          contextLine={
-            sigApproval.kind === 'chain'
-              ? `${sigApproval.chain.name} · ${sigApproval.chain.symbol} — Ika dWallet path (preview network)`
-              : 'Jupiter — live swap; wallet signs after you confirm (preview network in this build)'
-          }
-          processLine={
-            sigApproval.kind === 'chain'
-              ? '2PC-MPC · Ika dWallet MessageApproval (pre-alpha / preview — see Learn disclaimer)'
-              : '2PC-MPC · route attestation (preview — same flow at mainnet launch)'
-          }
+          contextLine={`${sigApproval.chain.name} · ${sigApproval.chain.symbol} — Ika dWallet path (preview network)`}
+          processLine="2PC-MPC · Ika dWallet MessageApproval (pre-alpha / preview — see Learn disclaimer)"
         />
       )}
 

@@ -1,14 +1,14 @@
-# PRISM — Sovereign command for cross-chain identity and private policy
+# PRISM — programmable asset authority on Solana
 
 [![CI](https://github.com/harmony-hubs/Prism_/actions/workflows/ci.yml/badge.svg)](https://github.com/harmony-hubs/Prism_/actions/workflows/ci.yml)
 
-**One identity. Every chain. Nothing exposed.**
+**Solana defines asset authority. Native chains keep the asset.**
 
 Public repo: **[github.com/harmony-hubs/Prism_](https://github.com/harmony-hubs/Prism_)** (MIT).
 
 **[Colosseum Frontier 2026](https://colosseum.com/frontier)** — **Encrypt & Ika** track · [Superteam — Bridgeless & encrypted capital markets](https://superteam.fun/earn/listing/encrypt-ika-frontier-april-2026)
 
-PRISM is a **Sovereign Command Center** for cross-chain identity. It pairs a **Solana controller** with **operator UX** and uses **Ika** (2PC-MPC **dWallets** on Solana) for bridgeless `approve_message` / **MessageApproval** flows, plus **Encrypt**-shaped **policy gating** (on-chain eligibility before that CPI).
+PRISM is a **command surface for programmable asset authority**. It pairs a **Solana policy program** with an **operator UI** and uses **Ika dWallets** for native-chain `approve_message` / **MessageApproval** flows, plus **Encrypt**-shaped **policy gating** (on-chain eligibility before that CPI). It is **not** a bridge, a wrapped-asset issuer, or a consumer wallet app — see the canonical memo at the top of [`src/dwallet/solanaGuide.ts`](src/dwallet/solanaGuide.ts) (`DWALLET_AUTHORITY_FRAMING_SEGMENTS`).
 
 ### At a glance (Ika / reviewers)
 
@@ -22,11 +22,34 @@ PRISM is a **Sovereign Command Center** for cross-chain identity. It pairs a **S
 
 **Internal Ika stack (Solana vs Sui SDK):** see **[IKA_INTEGRATION.md](IKA_INTEGRATION.md)** before adding TS snippets or new flows.
 
+> **Pre-alpha disclaimer (Ika, abridged from the book).** *Pre-alpha only: no real MPC — a single mock signer; interfaces and formats may change; devnet state may be wiped before Ika Alpha 1. Do not use real funds, do not rely on keys or security, software is as-is.* See the [dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/print.html) — search **“Pre-Alpha Disclaimer”** for the full text, and our `PRE_ALPHA_DISCLAIMER_SHORT` constant in `src/dwallet/solanaGuide.ts`.
+
+### dWallet: authority, not transport
+
+PRISM reproduces the **Ika team's** dWallet positioning memo **verbatim** in [`DWALLET_AUTHORITY_FRAMING_SEGMENTS`](src/dwallet/solanaGuide.ts), with attribution at [`DWALLET_AUTHORITY_FRAMING_ATTRIBUTION`](src/dwallet/solanaGuide.ts) and a byline in **Learn** (`data-testid="dwallet-authority-attribution"`). PRISM **did not author** that text — we render it word-for-word so reviewer-facing copy stays faithful to the primitive's authors. Edit the segments only when the source memo changes; the UI and docs follow.
+
+**Pull quote (one line from that memo):** *Ika lets Solana programs control native asset actions on any chain through programmable, zero-trust signing.*
+
+### Ika docs ↔ this repo (60-second cross-walk)
+
+| Ika doc / concept | Where in this repo |
+|---|---|
+| [dWallet Developer Guide — Introduction](https://solana-pre-alpha.ika.xyz/introduction.html) | `src/dwallet/solanaGuide.ts` (`DWALLET_FLOW_STEPS`, `DWALLET_PRISM_CHECKLIST`) — same five-step flow with checklist parity |
+| [Print / single page](https://solana-pre-alpha.ika.xyz/print.html) | `IKA_INTEGRATION.md` — internal stack truth, Solana dWallet vs Sui SDK |
+| **CPI authority** seed `["__ika_cpi_authority"]` | `program/src/lib.rs` (`init_prism`); preview in `src/dwallet/solanaOnChain.ts::deriveCpiAuthorityPda` |
+| **`approve_message`** CPI | `program/src/lib.rs::approve_action` (and `approve_action_gated` for the policy-PDA path) |
+| **MessageApproval** account / disc 14 layout | `src/dwallet/solanaOnChain.ts::parseMessageApprovalData` (status @172, sig_len @173–174, sig @175+) |
+| **MessageApproval PDA** seeds (`["dwallet", chunks(curve_u16‖pubkey)], "message_approval", scheme_u16_le, keccak256(message)`) | `src/dwallet/solanaOnChain.ts::deriveMessageApprovalPda` + `dwalletPdaSeedChunks` |
+| **DWalletCoordinator** PDA `find_program_address(["dwallet_coordinator"], ika_dwallet_program_id)` | `client/src/main.rs` (CLI) — used in `approve_action` instruction account list |
+| **Signature scheme** encoding (u16 LE in ix data) | `client/src/main.rs`, mirrored in `AGENTS.md` |
+| **gRPC: SubmitTransaction / Sign / DKG** | `client/src/ika_client.rs` (`prism-client` binary `prism`) |
+| **Sui `IkaClient` (`@ika.xyz/sdk`)** | **Not** the Solana DKG path — see [`IKA_INTEGRATION.md`](IKA_INTEGRATION.md) §"Two Ika tracks" |
+
 ### Product story (demos, press, and first-time users)
 
 - **What it is:** a single app surface where users keep their normal wallets, while your **policy program** (plus optional Encrypt direction) can approve **Ika dWallet** signatures and native-chain message approvals without PRISM or a bridge **custodying** user funds.  
-- **What you do in the app:** connect Phantom, use **Send / Receive** (wallet-signed transfers), open **Learn** for the dWallet + operator path, or **Trade** (Jupiter) with the same confirm pattern as in production.  
-- **Why it matters for the industry:** the default is fragmented keys and more bridge **surface area**. A controller on Solana that approves **native** signatures and private eligibility is a path to **less bridge custody** and clearer user intent.  
+- **What you do in the app:** connect Phantom, use **Send / Receive** (wallet-signed transfers), and open **Learn** for the dWallet + operator path. PRISM is a **control surface**, not a swap UI; same-chain DEXes are a separate product layer.  
+- **Why it matters for the industry:** the default is *representation-first* (more wrappers, more bridges). A program on Solana that approves **native** signatures and private eligibility moves logic to *what should be allowed to sign* — that is bridgeless capital markets per the canonical memo.  
 - **This repo’s chain:** the web build targets **Solana devnet** (value-free) so the flow is safe to show publicly; the **UI and product narrative** are written as if the same app ships after mainnet — devnet is implementation detail, not the headline.
 
 ---
@@ -49,7 +72,7 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 
 | Piece | What it does | How PRISM uses it |
 |-------|----------------|-------------------|
-| **Ika** | MPC dWallets on Solana — **native** chain signing from **approved** messages, not custodial bridges | Our **PRISM program** uses **`ika-dwallet-pinocchio`**, a **CPI PDA**, and **CPI `approve_message`** to the Ika dWallet program; **off-chain** `prism-client` uses `ika-grpc` + `ika-dwallet-types`. |
+| **Ika dWallet** | **Programmable signing authority**: native-chain signatures conditioned on a Solana program — not a bridge, not a wrapped balance, not a wallet UI. | Our **PRISM program** uses **`ika-dwallet-pinocchio`**, a **CPI PDA**, and **CPI `approve_message`** to the Ika dWallet program; **off-chain** `prism-client` uses `ika-grpc` + `ika-dwallet-types`. |
 | **Encrypt** | Confidential policy / FHE direction on Solana | We ship a **per–message-hash policy PDA** and **`approve_action_gated`**: the **same** Ika CPI only if **`eligible == 1`**. The **demo setter** stands in until **Encrypt `execute_graph` / real CPI** drives eligibility. |
 
 ---
@@ -90,7 +113,6 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 │   ├── boot.tsx
 │   ├── main.tsx
 │   ├── PrismLearn.tsx       # dWallet / Ika + Encrypt story + Operator tools
-│   ├── PrismTrade.tsx      # Jupiter-integrated live swap (separate from devnet demo)
 │   ├── SovereignCommand.tsx
 │   └── dwallet/             # On-chain helpers, Phantom, solanaOnChain, guides
 ├── e2e/                     # Playwright (splash → hub → dWallet lab)
@@ -131,9 +153,8 @@ Pinocchio + [`ika_dwallet_pinocchio`](https://github.com/dwallet-labs/ika-pre-al
 |------|------------|
 | **Splash / hub** | Passkey- / Google-**style** entry (WaaP SDK when exports exist) → **Assets** (chain “facets” + est. portfolio), **Activity** |
 | **Learn / dWallet** | Ika + Encrypt narrative, book checklist, **Operator console** (PDA, keccak, inspect, MessageApproval) |
-| **Sovereign** | Devnet **heartbeat / trap** UI when `VITE_PRISM_PROGRAM_ID` is set and Phantom is connected |
-| **Trade** | **Jupiter** plugin — **real Solana** swap surface (not play-money; disclaimer in UI) |
-| **Test sign** (facets) | **Practice** UI feedback — not a full on-chain Ika sign by itself |
+| **Command center** | Devnet **heartbeat / trap** UI (PRISM `prism_sovereign` PDA) when `VITE_PRISM_PROGRAM_ID` is set and Phantom is connected — armed / inactivity / panic / recovery |
+| **Test sign** (facets) | **Practice** UI feedback for the dWallet path — not a full on-chain Ika sign by itself |
 
 ---
 
@@ -244,7 +265,7 @@ CPI PDA: `find_program_address(["__ika_cpi_authority"], YOUR_PRISM_PROGRAM_ID)` 
 
 - **Ika:** on-chain **CPI** to **your** controller + **MessageApproval**-aligned **CLI** and **Operator UI**.  
 - **Encrypt:** **Composable gate** in front of the **same** Ika CPI; roadmap to **real Encrypt** driving eligibility.  
-- **UX + proof:** one shell for **dWallet** education, **Sovereign** devnet tools, and optional **Jupiter** live trading — with clear **pre-alpha** disclaimers.
+- **UX + proof:** one shell for **dWallet** education, **command center** devnet tools (heartbeat / inactivity / panic / recovery), and **Operator console** (PDA, keccak, MessageApproval) — with clear **pre-alpha** disclaimers. PRISM stays a **control surface**, not a swap UI.
 
 ---
 
@@ -254,4 +275,4 @@ CPI PDA: `find_program_address(["__ika_cpi_authority"], YOUR_PRISM_PROGRAM_ID)` 
 
 ---
 
-*PRISM — one beam; policy and bridgeless execution where you put them.*
+*PRISM — Solana programs control native asset actions on any chain through programmable, zero-trust signing.*

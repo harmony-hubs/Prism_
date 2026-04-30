@@ -41,6 +41,205 @@ export const IKA_ENCRYPT_BRIDGELESS_STORY = {
 } as const;
 
 /**
+ * Attribution for the canonical dWallet framing memo below.
+ *
+ * The text in `DWALLET_AUTHORITY_FRAMING_SEGMENTS` is reproduced **verbatim** from the
+ * Ika team's "A dWallet Is Not a Bridge — It Is Programmable Asset Authority" positioning
+ * memo (the memo references "David" — the Ika team's framing of self-custody / usability /
+ * decentralization). PRISM stores it word-for-word so reviewer-facing copy stays faithful
+ * to the primitive's authors rather than paraphrasing it into our voice.
+ *
+ * If attribution should be sharpened, weakened, or removed, edit this constant — and the
+ * Learn UI byline + IKA_INTEGRATION.md attribution row will follow.
+ */
+export const DWALLET_AUTHORITY_FRAMING_ATTRIBUTION = {
+  source: 'Ika team positioning memo',
+  note: 'Reproduced verbatim in PRISM for reviewer fidelity — not authored by PRISM.',
+  href: 'https://ika.xyz/',
+} as const;
+
+/**
+ * Canonical dWallet positioning — verbatim source for PRISM Learn and reviewer copy.
+ * Do not paraphrase; edits are product decisions. Keep README / IKA_INTEGRATION pointers in sync.
+ *
+ * Attribution: see `DWALLET_AUTHORITY_FRAMING_ATTRIBUTION` above.
+ */
+export const DWALLET_AUTHORITY_FRAMING_SEGMENTS = [
+  { kind: 'h1' as const, text: 'A dWallet Is Not a Bridge.' },
+  { kind: 'h2' as const, text: 'It Is Programmable Asset Authority.' },
+  {
+    kind: 'p' as const,
+    text:
+      'Most cross-chain products start with a transfer. A dWallet starts with authority.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'That difference sounds small until you trace where the risk actually lives. A bridge asks users to trust a path that creates or moves a representation of an asset. A dWallet asks a different question: under what conditions should a native asset action be signed?',
+  },
+  {
+    kind: 'p' as const,
+    text: 'That is the better primitive for serious multichain finance.',
+  },
+  { kind: 'h3' as const, text: 'TL;DR' },
+  {
+    kind: 'ul' as const,
+    items: [
+      'A dWallet is programmable signing authority, not a bridge, a wrapped token, or a consumer wallet app.',
+      'The user is cryptographically required for signing, while application policy can also be enforced through the network path.',
+      'Solana programs can define the conditions under which actions involving assets on other chains are approved.',
+      'The result is not "moving Bitcoin to Solana." It is letting Solana coordinate native-asset control without making a wrapped-asset assumption.',
+    ],
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'Bridgeless capital markets are best understood as programmable native-asset authority, not wrapped-asset transport.',
+  },
+  { kind: 'h3' as const, text: 'The category error' },
+  {
+    kind: 'p' as const,
+    text: 'The default crypto mental model is representation-first.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'You have an asset somewhere. You want to use it somewhere else. So the system creates a claim, wrapper, voucher, receipt, bridged balance, or derivative. The application then builds around that representation and pretends the representation is close enough to the original asset.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'Sometimes that is useful. It is also the source of a lot of market structure pain: fragmented liquidity, extra custody assumptions, extra operational paths, and another place where users have to ask whether they are holding the thing itself or a shadow of the thing.',
+  },
+  {
+    kind: 'p' as const,
+    text: 'A dWallet is the opposite mental model.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'It does not begin with "how do we represent this asset somewhere else?" It begins with "what should be allowed to sign for this asset?"',
+  },
+  {
+    kind: 'p' as const,
+    text: 'That is why the simple definition matters:',
+  },
+  {
+    kind: 'p' as const,
+    text: 'A dWallet is programmable asset authority.',
+  },
+  { kind: 'h3' as const, text: 'Why signatures are the real control point' },
+  {
+    kind: 'p' as const,
+    text:
+      'Every asset action eventually reaches an authority boundary. A Bitcoin transaction needs a Bitcoin signature. An Ethereum transaction needs an Ethereum signature. A Zcash transaction needs the relevant signature. A multisig release, treasury action, rebalance, admin-key operation, collateral movement, or agent action all eventually become a question of signing.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'If the signing key is raw and binary, the product is trapped. Either the key can do everything or it can do nothing. If a centralized operator mediates the key, the user inherits the operator. If a bridge or custodian holds the asset, the user inherits the bridge or custodian.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'A dWallet changes where product logic can live. The application can express policy before the signature is completed. The policy can say which assets are in scope, which actions are allowed, which counterparties are acceptable, what limits apply, when escalation is required, and when the request must be rejected.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'The asset does not need to become a wrapper for the application to have meaningful control. The application can govern the signing path itself.',
+  },
+  {
+    kind: 'h3' as const,
+    text: 'What makes this different from normal MPC',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'Normal MPC custody can still become a trusted committee problem. A group of parties may hold enough authority to move funds. If the threshold is compromised, coerced, or socially engineered, the user may have no cryptographic backstop.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      "The dWallet model is more interesting because the user is not optional. The user's participation is structurally required for signature generation, while the network side can enforce policy at scale. That means the product can combine user ownership, programmable rules, and decentralized execution instead of choosing two and sacrificing the third.",
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'This is the point David keeps coming back to: self-custody, usability, and decentralization should not be treated as mutually exclusive.',
+  },
+  { kind: 'h3' as const, text: 'What Solana adds' },
+  {
+    kind: 'p' as const,
+    text: 'Solana becomes the policy and coordination layer.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'A Solana program can decide whether a requested native-asset action should be approved. It can enforce rules at application speed. It can compose with other Solana programs. It can provide the developer surface where builders already ship fast financial products.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'The signed transaction can then be broadcast to the destination chain. The action is native to that chain, but the policy can be expressed on Solana.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'That is the heart of bridgeless capital markets: not every asset has to be recreated on Solana before Solana can become the operating system for how that asset is used.',
+  },
+  { kind: 'h3' as const, text: 'What builders should stop saying' },
+  {
+    kind: 'ul' as const,
+    items: [
+      'Stop saying "dWallets bridge assets." That undersells the primitive and invites the wrong comparison.',
+      'Stop saying "this is just another wallet." A consumer wallet is an interface. A dWallet is a signing and control primitive.',
+      'Stop saying "wrapped assets, but safer." That still centers the wrapper. The point is to remove the wrapper as the default assumption.',
+    ],
+  },
+  {
+    kind: 'p' as const,
+    text: 'The sharper framing is:',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'Ika lets Solana programs control native asset actions on any chain through programmable, zero-trust signing.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'That sentence is technical enough to be true and simple enough to travel.',
+  },
+  { kind: 'h3' as const, text: 'The product surface' },
+  {
+    kind: 'p' as const,
+    text: 'Once you start from signing authority, the application map becomes obvious.',
+  },
+  {
+    kind: 'ul' as const,
+    items: [
+      'A treasury product can manage Bitcoin, Ethereum, Zcash, stablecoins, and protocol admin keys through one policy layer.',
+      'A custody product can offer passkeys, social recovery, spending limits, delayed execution, destination allowlists, dynamic thresholds, and emergency controls without becoming the custodian.',
+      'An AI agent can propose actions across chains, but the policy decides what it may actually sign.',
+      'A lending product can accept native collateral from another chain without assuming the first product decision is "wrap it."',
+      'A multisig can become a programmable operations system instead of a static approval box.',
+    ],
+  },
+  { kind: 'h3' as const, text: 'Build with programmable authority' },
+  {
+    kind: 'p' as const,
+    text:
+      'Build the first products where Solana does not just receive bridged assets. Build products where Solana defines asset authority.',
+  },
+  {
+    kind: 'p' as const,
+    text:
+      'That is the difference between cross-chain access and bridgeless capital markets.',
+  },
+] as const;
+
+/**
  * Condensed from the book’s Pre-Alpha Disclaimer (same obligations: exploratory only).
  * @see https://solana-pre-alpha.ika.xyz/print.html — search “Pre-Alpha Disclaimer”
  */
@@ -139,7 +338,7 @@ export const PRISM_INDUSTRY_SHIFT =
 
 export const PRISM_HOW_STEPS = [
   "Connect Phantom to see your Solana line. Use Receive to copy an address, or Send for a short checklist in Phantom or a Sui wallet. Every transfer is signed in your extension — PRISM never pushes your money for you.",
-  "Open Ika & dWallet in Learn for the dWallet and MessageApproval operator path, or Trade (Jupiter) to swap. The confirmation pattern is the same as on any production wallet, without PRISM in the spend path.",
+  "Open Ika & dWallet in Learn for the dWallet, MessageApproval, and policy-gate operator path. The confirmation pattern is the same as on any production wallet — PRISM never moves your funds, it coordinates what your program is allowed to sign.",
   "Use Command center (below) for automation and the demo policy gate, or tap the prism above for the full-screen overview — flash a practice beam to exercise 2PC-MPC style signing (preview stack).",
 ] as const;
 
@@ -152,7 +351,11 @@ export const PRISM_GLOSSARY = [
     term: 'Preview network (devnet)',
     plain: 'This release runs on a public value-free chain (e.g. Solana devnet) so demos are safe; the app surface is what we are shipping toward production.',
   },
-  { term: 'dWallet', plain: 'A signing key lives on-chain and can be controlled by your program, not only by a phone app.' },
+  {
+    term: 'dWallet',
+    plain:
+      'A dWallet is programmable asset authority. Programmable signing authority, not a bridge, a wrapped token, or a consumer wallet app (see Learn — canonical framing).',
+  },
   { term: 'Message approval', plain: 'An on-chain note that “this exact message was approved” so the network can attach a signature.' },
   { term: 'PDA', plain: 'A special Solana address computed from seeds and a program — no seed phrase in your notebook.' },
   { term: 'Phantom', plain: 'A browser extension wallet many people use for Solana — the keys live in the extension, not in PRISM.' },

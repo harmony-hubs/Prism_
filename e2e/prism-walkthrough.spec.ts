@@ -91,17 +91,9 @@ test.describe('PRISM — scripted walkthrough (Chrome)', () => {
       await expect(page.getByRole('heading', { name: 'Operator console' })).toBeVisible();
     });
 
-    await test.step('9. Trade hub — beam swap / agents tabs', async () => {
+    await test.step('9. Return to wallet hub', async () => {
       await page.getByTestId('learn-back').click();
       await expect(page.getByTestId('hub-screen')).toBeVisible();
-      await page.getByTestId('open-trade-beam').click();
-      await expect(page.getByTestId('signature-approval-modal')).toBeVisible();
-      await expect(page.getByTestId('signature-approval-confirm')).toBeVisible({ timeout: 10_000 });
-      await page.getByTestId('signature-approval-confirm').click();
-      await expect(page.getByTestId('trade-hub')).toBeVisible();
-      await expect(page.getByTestId('trade-tab-dex')).toBeVisible();
-      await page.getByTestId('trade-tab-agents').click();
-      await expect(page.getByText(/Nothing here executes trades yet/i)).toBeVisible();
     });
   });
 });

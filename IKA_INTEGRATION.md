@@ -7,7 +7,7 @@ This document is the **source of truth** for how this repository talks to **Ika*
 | Theme | Avoid | Do instead | Status |
 |--------|--------|------------|--------|
 | **Onboarding** | Sui `IkaClient` in the browser for Solana dWallet DKG | **`prism` CLI** (gRPC) for DKG/creation; **UI = glass** (show CPI/MessageApproval/dWallet material from real keys & RPC) | On track; wire CLI output → UI is the next *product* step |
-| **“Bridgeless” policy** | Framing **Jupiter** as “the bridge problem” for **same-ledger** SOL swaps | **Jupiter** = optional **Solana DEX** liquidity (different concern). **Ika story** = **`approve_message`** / **MessageApproval** and **`approve_action_gated`** (Solana program as gate) for **native** signing *per book* | On track; keep the two ideas separate in talks |
+| **“Bridgeless” framing** | Mixing same-ledger DEX swaps (e.g. Jupiter) into the bridgeless story; positioning PRISM as a wallet UI with a swap | **Ika story only** = **`approve_message`** / **MessageApproval** and **`approve_action_gated`** (Solana program as policy gate) for **native** signing on each chain. PRISM is a control surface, not a swap UI. | On track; same-chain DEXes are a separate product surface and not in this build |
 | **Stack** | Anchor / Sui-only mental model for this program | **Pinocchio** `program/` + **Rust gRPC** `client/`; book-aligned | Correct |
 
 **Environment:** Set **`VITE_PRISM_PROGRAM_ID`** in `.env` after deploy so the hub, Sovereign, and Learn can derive PDAs and talk about *your* controller id—not optional for a convincing “Sovereign” demo.
@@ -23,7 +23,7 @@ This document is the **source of truth** for how this repository talks to **Ika*
 
 **Rule:** If a snippet uses `IkaClient({ suiClient, config })` and `@mysten/sui`, it targets the **Sui Ika** surface. **Solana** dWallet work follows the **book + gRPC** path below.
 
-**Rule:** The **`@ika.xyz/sdk`** entry in `package.json` is **not** permission to do Solana MPC from the Vite app without a designed bridge. Treat it as **separate** until explicitly wired and documented in this file.
+**Rule:** The **`@ika.xyz/sdk`** entry in `package.json` is **kept on purpose** as a tracking dependency for the Sui Ika surface (typings + reference) — it is **not** wired into the Vite app for Solana MPC, and is **not** permission to do Solana DKG in the browser. If we ever wire a Solana-side helper from this package, the architecture must be added to this doc first.
 
 ---
 
@@ -59,6 +59,16 @@ This document is the **source of truth** for how this repository talks to **Ika*
 
 ---
 
+## Product framing: dWallet (verbatim canonical)
+
+The full positioning memo — **word-for-word** — is **`DWALLET_AUTHORITY_FRAMING_SEGMENTS`** in `src/dwallet/solanaGuide.ts`. It renders in **Learn** (`data-testid="dwallet-authority-framing"`). **Do not paraphrase** in product-facing surfaces; change the segments array only when the canonical doc changes.
+
+**Attribution (mandatory):** the memo is attributed to the **Ika team positioning** (constant `DWALLET_AUTHORITY_FRAMING_ATTRIBUTION` in the same file, rendered as a byline above the section in Learn). PRISM **did not author** this text — we reproduce it verbatim because the primitive's authors framed it best. If attribution should change, edit the constant; the UI byline follows.
+
+**Pull quote (one line from that memo):** *Ika lets Solana programs control native asset actions on any chain through programmable, zero-trust signing.*
+
+---
+
 ## The gap: browser ↔ MPC
 
 - **Today:** dWallet **creation** and **MPC** sessions are **out of process** (CLI, keys on disk, gRPC to Ika).  
@@ -88,6 +98,7 @@ This document is the **source of truth** for how this repository talks to **Ika*
 | Web config (RPC, gRPC URL, Ika program id) | `src/config.ts` |
 | Operator + PDA / MessageApproval | `src/DWalletTools.tsx`, `src/dwallet/solanaOnChain.ts` |
 | Agent runbook (CLI + console) | `AGENTS.md` |
+| dWallet vs bridge (product copy) | **`DWALLET_AUTHORITY_FRAMING_SEGMENTS`** in `src/dwallet/solanaGuide.ts` (verbatim), Learn tab |
 | Sui in npm (`@ika.xyz/sdk`) | **Not** the Solana dWallet DKG path until stated otherwise in this file |
 
 ---
@@ -97,4 +108,7 @@ This document is the **source of truth** for how this repository talks to **Ika*
 | Date | Change |
 |------|--------|
 | 2026-04-22 | Initial: Pinocchio + `prism` gRPC = Solana dWallet; `@ika.xyz/sdk` `IkaClient` = Sui-oriented; no browser DKG by default. |
-| 2026-04-22 | Added team audit table + Jupiter / Ika framing; env note for `VITE_PRISM_PROGRAM_ID`. |
+| 2026-04-22 | Added team audit table; env note for `VITE_PRISM_PROGRAM_ID`. |
+| 2026-04-30 | Removed Jupiter swap UI; PRISM is a control surface only — same-chain DEXes are not in this build. |
+| 2026-04-22 | Product framing: verbatim memo in `DWALLET_AUTHORITY_FRAMING_SEGMENTS` + Learn section. |
+| 2026-04-30 | Attribution: memo attributed to Ika team positioning (`DWALLET_AUTHORITY_FRAMING_ATTRIBUTION`) — byline in Learn + this doc. |
