@@ -38,6 +38,7 @@ PRISM reproduces the **Ika team's** dWallet positioning memo **verbatim** in [`D
 | [Print / single page](https://solana-pre-alpha.ika.xyz/print.html) | `IKA_INTEGRATION.md` — internal stack truth, Solana dWallet vs Sui SDK |
 | **CPI authority** seed `["__ika_cpi_authority"]` | `program/src/lib.rs` (`init_prism`); preview in `src/dwallet/solanaOnChain.ts::deriveCpiAuthorityPda` |
 | **`approve_message`** CPI | `program/src/lib.rs::approve_action` (and `approve_action_gated` for the policy-PDA path) |
+| **DWallet account** / disc 2 layout (`docs/src/reference/accounts.md`) | Single source: `client/src/ika_client.rs::parse_ika_dwallet_account` (disc=2, authority@2, curve@34 u16 LE, pubkey_len@37, pubkey@38); browser mirror: `src/dwallet/solanaOnChain.ts::parseDWalletAccountData` |
 | **MessageApproval** account / disc 14 layout | `src/dwallet/solanaOnChain.ts::parseMessageApprovalData` (status @172, sig_len @173–174, sig @175+) |
 | **MessageApproval PDA** seeds (`["dwallet", chunks(curve_u16‖pubkey)], "message_approval", scheme_u16_le, keccak256(message)`) | `src/dwallet/solanaOnChain.ts::deriveMessageApprovalPda` + `dwalletPdaSeedChunks` |
 | **DWalletCoordinator** PDA `find_program_address(["dwallet_coordinator"], ika_dwallet_program_id)` | `client/src/main.rs` (CLI) — used in `approve_action` instruction account list |

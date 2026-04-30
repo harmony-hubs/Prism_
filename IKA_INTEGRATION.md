@@ -112,3 +112,4 @@ The full positioning memo — **word-for-word** — is **`DWALLET_AUTHORITY_FRAM
 | 2026-04-30 | Removed Jupiter swap UI; PRISM is a control surface only — same-chain DEXes are not in this build. |
 | 2026-04-22 | Product framing: verbatim memo in `DWALLET_AUTHORITY_FRAMING_SEGMENTS` + Learn section. |
 | 2026-04-30 | Attribution: memo attributed to Ika team positioning (`DWALLET_AUTHORITY_FRAMING_ATTRIBUTION`) — byline in Learn + this doc. |
+| 2026-04-30 | Book conformance pass: CLI `Inspect` was using stale dWallet account offsets (authority@0, curve@98 u8, pubkey_len@97, pubkey@32). All three layers now share the canonical book layout (disc=2, authority@2, curve@34 u16 LE, pubkey_len@37, pubkey@38) via `client/src/ika_client.rs::parse_ika_dwallet_account` (single source of truth). Added unit tests locking the layout. |

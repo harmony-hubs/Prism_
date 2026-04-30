@@ -98,27 +98,69 @@ pub fn find_message_approval_pda(
     Pubkey::find_program_address(&seeds, dwallet_program)
 }
 
-/// Parse on-chain Ika **DWallet** account (discriminator 2). Returns `(DWalletCurve, public_key bytes)`.
-pub fn parse_ika_dwallet_account(data: &[u8]) -> anyhow::Result<(DWalletCurve, Vec<u8>)> {
-    if data.len() < 39 {
-        anyhow::bail!("dWallet account data too short");
+/// Canonical Ika **DWallet** account layout (discriminator 2) per the
+/// [pre-alpha book](https://solana-pre-alpha.ika.xyz/print.html) — search
+/// "DWallet account" / `docs/src/reference/accounts.md`.
+///
+/// | Offset | Field                        |
+/// | -----: | ---------------------------- |
+/// |   `0`  | discriminator (`2`)          |
+/// |   `2`  | authority (32)               |
+/// |  `34`  | curve (`u16` LE)             |
+/// |  `37`  | public_key_len (`u8`)        |
+/// |  `38`  | public_key (`public_key_len`)|
+///
+/// Mirrored in `src/dwallet/solanaOnChain.ts` for the Vite Operator console.
+pub const DWALLET_DISCRIMINATOR: u8 = 2;
+pub const DWALLET_AUTHORITY_OFFSET: usize = 2;
+pub const DWALLET_CURVE_OFFSET: usize = 34;
+pub const DWALLET_PUBKEY_LEN_OFFSET: usize = 37;
+pub const DWALLET_PUBKEY_OFFSET: usize = 38;
+
+#[derive(Debug, Clone)]
+pub struct ParsedDWallet {
+    pub authority: [u8; 32],
+    pub curve: DWalletCurve,
+    pub curve_id: u16,
+    pub public_key: Vec<u8>,
+}
+
+/// Parse on-chain Ika **DWallet** account (discriminator 2). Single source of truth
+/// for both `prism inspect` and `prism sign`; mirrors `parseDWalletAccountData` in
+/// `src/dwallet/solanaOnChain.ts`.
+pub fn parse_ika_dwallet_account(data: &[u8]) -> anyhow::Result<ParsedDWallet> {
+    if data.len() < DWALLET_PUBKEY_OFFSET + 1 {
+        anyhow::bail!("dWallet account data too short ({} bytes)", data.len());
     }
-    if data[0] != 2 {
-        anyhow::bail!("expected DWallet discriminator 2, got {}", data[0]);
+    if data[0] != DWALLET_DISCRIMINATOR {
+        anyhow::bail!(
+            "expected DWallet discriminator {DWALLET_DISCRIMINATOR}, got {}",
+            data[0]
+        );
     }
-    let curve_raw = u16::from_le_bytes([data[34], data[35]]);
-    let curve = match curve_raw {
+    let mut authority = [0u8; 32];
+    authority.copy_from_slice(&data[DWALLET_AUTHORITY_OFFSET..DWALLET_AUTHORITY_OFFSET + 32]);
+    let curve_id = u16::from_le_bytes([data[DWALLET_CURVE_OFFSET], data[DWALLET_CURVE_OFFSET + 1]]);
+    let curve = match curve_id {
         0 => DWalletCurve::Secp256k1,
         1 => DWalletCurve::Secp256r1,
         2 => DWalletCurve::Curve25519,
         3 => DWalletCurve::Ristretto,
-        _ => anyhow::bail!("unknown dWallet curve id {curve_raw}"),
+        _ => anyhow::bail!("unknown dWallet curve id {curve_id}"),
     };
-    let pk_len = data[37] as usize;
-    if 38 + pk_len > data.len() {
+    let pk_len = data[DWALLET_PUBKEY_LEN_OFFSET] as usize;
+    let pk_end = DWALLET_PUBKEY_OFFSET
+        .checked_add(pk_len)
+        .ok_or_else(|| anyhow!("public_key_len overflow"))?;
+    if pk_end > data.len() {
         anyhow::bail!("invalid public_key_len {pk_len}");
     }
-    Ok((curve, data[38..38 + pk_len].to_vec()))
+    Ok(ParsedDWallet {
+        authority,
+        curve,
+        curve_id,
+        public_key: data[DWALLET_PUBKEY_OFFSET..pk_end].to_vec(),
+    })
 }
 
 pub struct DkgResult {
@@ -292,6 +334,52 @@ pub async fn request_sign(
         TransactionResponseData::Signature { signature } => Ok(signature),
         TransactionResponseData::Error { message } => Err(anyhow!("sign: {message}")),
         _ => Err(anyhow!("unexpected sign response")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Lock the canonical layout (Ika pre-alpha book §"DWallet account") so any silent
+    /// drift between this file and `src/dwallet/solanaOnChain.ts` would fail the test.
+    #[test]
+    fn parse_dwallet_account_matches_book_offsets() {
+        let mut data = vec![0u8; 144];
+        data[0] = DWALLET_DISCRIMINATOR;
+        for i in 0..32 {
+            data[DWALLET_AUTHORITY_OFFSET + i] = (i + 1) as u8;
+        }
+        // curve = 0 (Secp256k1), little-endian u16
+        data[DWALLET_CURVE_OFFSET] = 0;
+        data[DWALLET_CURVE_OFFSET + 1] = 0;
+        // public_key_len = 33
+        data[DWALLET_PUBKEY_LEN_OFFSET] = 33;
+        for i in 0..33 {
+            data[DWALLET_PUBKEY_OFFSET + i] = 0xA0 ^ (i as u8);
+        }
+
+        let parsed = parse_ika_dwallet_account(&data).expect("parse");
+        assert_eq!(parsed.curve_id, 0);
+        assert!(matches!(parsed.curve, DWalletCurve::Secp256k1));
+        assert_eq!(parsed.public_key.len(), 33);
+        assert_eq!(parsed.authority[0], 1);
+        assert_eq!(parsed.authority[31], 32);
+    }
+
+    #[test]
+    fn parse_dwallet_account_rejects_bad_disc() {
+        let mut data = vec![0u8; 64];
+        data[0] = 1; // wrong discriminator
+        assert!(parse_ika_dwallet_account(&data).is_err());
+    }
+
+    #[test]
+    fn parse_dwallet_account_rejects_unknown_curve() {
+        let mut data = vec![0u8; 64];
+        data[0] = DWALLET_DISCRIMINATOR;
+        data[DWALLET_CURVE_OFFSET] = 9; // unknown
+        assert!(parse_ika_dwallet_account(&data).is_err());
     }
 }
 

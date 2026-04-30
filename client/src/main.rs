@@ -45,10 +45,8 @@ const CLOCK_SYSVAR: Pubkey = pubkey!("SysvarC1ock1111111111111111111111111111111
 /// Rent sysvar (required by `init_encrypt_policy_gate`).
 const RENT_SYSVAR: Pubkey = pubkey!("SysvarRent111111111111111111111111111111111");
 
-const DWALLET_AUTHORITY_OFFSET: usize = 0;
-const DWALLET_PUBKEY_OFFSET: usize = 32;
-const DWALLET_PUBKEY_LEN_OFFSET: usize = 97;
-const DWALLET_CURVE_OFFSET: usize = 98;
+// dWallet account offsets are owned by `ika_client::parse_ika_dwallet_account`
+// (single source of truth, mirrored in `src/dwallet/solanaOnChain.ts`).
 
 const APPROVAL_STATUS_OFFSET: usize = 172;
 const APPROVAL_SIG_LEN_OFFSET: usize = 173;
@@ -146,7 +144,7 @@ enum Commands {
     },
 }
 
-fn curve_name(id: u8) -> &'static str {
+fn curve_name(id: u16) -> &'static str {
     match id {
         0 => "Secp256k1 (BTC/ETH)",
         1 => "Secp256r1 (WebAuthn)",
@@ -525,10 +523,10 @@ async fn main() -> anyhow::Result<()> {
                 .get_account(&dwallet_pk)
                 .context("get_account dWallet")?
                 .ok_or_else(|| anyhow::anyhow!("dWallet account not found at {dwallet_pk}"))?;
-            let (dwallet_curve, pk_bytes) = parse_ika_dwallet_account(&acc.data)?;
+            let parsed = parse_ika_dwallet_account(&acc.data)?;
             let (msg_appr, bump) = find_message_approval_pda(
-                dwallet_curve,
-                &pk_bytes,
+                parsed.curve,
+                &parsed.public_key,
                 scheme_u16,
                 &message_hash,
                 &ika_dwallet_program,
@@ -724,21 +722,20 @@ async fn main() -> anyhow::Result<()> {
         Commands::Inspect { dwallet } => {
             let dwallet_pubkey = Pubkey::from_str(&dwallet)?;
             match rpc.get_account(&dwallet_pubkey) {
-                Ok(Some(account)) => {
-                    let data = account.data;
-                    if data.len() > DWALLET_CURVE_OFFSET {
-                        let authority = Pubkey::from(
-                            <[u8; 32]>::try_from(&data[DWALLET_AUTHORITY_OFFSET..DWALLET_AUTHORITY_OFFSET + 32]).unwrap(),
-                        );
-                        let pubkey_len = data[DWALLET_PUBKEY_LEN_OFFSET] as usize;
-                        let pubkey_bytes = &data[DWALLET_PUBKEY_OFFSET..DWALLET_PUBKEY_OFFSET + pubkey_len];
-                        let curve = data[DWALLET_CURVE_OFFSET];
+                Ok(Some(account)) => match parse_ika_dwallet_account(&account.data) {
+                    Ok(parsed) => {
+                        let authority = Pubkey::from(parsed.authority);
                         println!("Address:    {dwallet_pubkey}");
                         println!("Authority:  {authority}");
-                        println!("Curve:      {} (id: {curve})", curve_name(curve));
                         println!(
-                            "Public Key: {} ({pubkey_len} bytes)",
-                            bs58::encode(pubkey_bytes).into_string()
+                            "Curve:      {} (id: {})",
+                            curve_name(parsed.curve_id),
+                            parsed.curve_id
+                        );
+                        println!(
+                            "Public Key: {} ({} bytes)",
+                            bs58::encode(&parsed.public_key).into_string(),
+                            parsed.public_key.len()
                         );
                         if let Some(ref hp) = cli.prism_program {
                             let prism_pid = Pubkey::from_str(hp)?;
@@ -749,10 +746,9 @@ async fn main() -> anyhow::Result<()> {
                                 println!("\n⚠️  Authority does not match CPI PDA for that program id");
                             }
                         }
-                    } else {
-                        println!("Account data too small — may not be a dWallet");
                     }
-                }
+                    Err(e) => println!("Not a dWallet account: {e}"),
+                },
                 Ok(None) => println!("Account not found"),
                 Err(e) => println!("Could not fetch account: {e}"),
             }
