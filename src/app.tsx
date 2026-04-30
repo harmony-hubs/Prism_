@@ -798,17 +798,18 @@ export const Prism: React.FC = () => {
                 {PRISM_SPECTRUM_LEDE}
               </p>
 
+              {chains.length > 0 && (
+                <PrismBeams
+                  containerRef={prismCanvasRef}
+                  originRef={prismOriginRef}
+                  originYInset={26}
+                  getTargetElement={getChainRowElement}
+                  targets={chains.map((c) => ({ id: c.id, color: c.color }))}
+                  signingId={signingId}
+                />
+              )}
+
               <div className="relative z-[1] mt-5 flex flex-col gap-4">
-                {chains.length > 0 && (
-                  <PrismBeams
-                    containerRef={prismCanvasRef}
-                    originRef={prismOriginRef}
-                    originYInset={26}
-                    getTargetElement={getChainRowElement}
-                    targets={chains.map((c) => ({ id: c.id, color: c.color }))}
-                    signingId={signingId}
-                  />
-                )}
                 {chains.map((c, idx) => {
                 const isSol = c.id === 'sol';
                 const isSui = c.id === 'sui';
