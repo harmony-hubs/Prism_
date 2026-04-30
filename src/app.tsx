@@ -15,7 +15,7 @@ import {
   PRISM_VISION_LEDE,
   readConnectedPubkey,
 } from './dwallet';
-import { ChainSpectrum } from './ChainSpectrum';
+import { PrismBeams } from './PrismBeams';
 import { PrismGlyph } from './PrismGlyph';
 import { SovereignCommand } from './SovereignCommand';
 import { SignatureApprovalModal } from './SignatureApprovalModal';
@@ -192,32 +192,19 @@ export const Prism: React.FC = () => {
   const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity }>(null);
   const [confettiOn, setConfettiOn] = useState(false);
   const [beamFlashOn, setBeamFlashOn] = useState(false);
-  const [spectrumFlashId, setSpectrumFlashId] = useState<string | null>(null);
-  const spectrumFlashTimer = useRef<number | null>(null);
-  const handleSpectrumBandTap = useCallback((id: string) => {
-    setSpectrumFlashId(id);
-    if (typeof document !== 'undefined') {
-      const row = document.querySelector(`[data-testid="facet-row-${id}"]`);
-      if (row instanceof HTMLElement) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-    if (spectrumFlashTimer.current !== null) {
-      window.clearTimeout(spectrumFlashTimer.current);
-    }
-    spectrumFlashTimer.current = window.setTimeout(() => {
-      setSpectrumFlashId(null);
-      spectrumFlashTimer.current = null;
-    }, 1400);
-  }, []);
-  useEffect(
-    () => () => {
-      if (spectrumFlashTimer.current !== null) {
-        window.clearTimeout(spectrumFlashTimer.current);
-      }
+  // Refs that anchor the prism beam layer: the canvas (whole assets section),
+  // the prism's inner wrapper (origin), and one element per chain row.
+  const prismCanvasRef = useRef<HTMLElement | null>(null);
+  const prismOriginRef = useRef<HTMLDivElement | null>(null);
+  const chainRowRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const setChainRowRef = useCallback(
+    (id: string) => (el: HTMLDivElement | null) => {
+      if (el) chainRowRefs.current.set(id, el);
+      else chainRowRefs.current.delete(id);
     },
     [],
   );
+  const getChainRowElement = useCallback((id: string) => chainRowRefs.current.get(id) ?? null, []);
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -641,39 +628,6 @@ export const Prism: React.FC = () => {
             </div>
           </section>
 
-          <button
-            type="button"
-            data-testid="open-command-center"
-            onClick={() => setHubMode('command')}
-            className="group mt-3 flex w-full max-w-[16rem] flex-col items-center rounded-2xl py-1 text-center transition active:scale-[0.99]"
-            aria-label="Open command overview — full-screen identity readout"
-          >
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">PRISM command</p>
-            <div className="relative transition duration-300 group-hover:opacity-95 group-focus-visible:ring-2 group-focus-visible:ring-violet-400/40 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-zinc-950 rounded-full">
-              <PrismGlyph
-                size={148}
-                isSigning={prismGlyphSigning}
-                spectrumColors={chains.map((c) => c.color)}
-                className="pointer-events-none shrink-0 select-none"
-              />
-            </div>
-            <p className="mt-1.5 max-w-[14rem] text-[10px] leading-snug text-white/28">Tap the prism for overview — controls stay below</p>
-          </button>
-
-          {chains.length > 0 && (
-            <div data-testid="prism-spectrum-block" className="mt-4 w-full max-w-[22rem] self-center">
-              <ChainSpectrum
-                chains={chains.map((c) => ({ id: c.id, symbol: c.symbol, color: c.color }))}
-                signingId={signingId}
-                flashId={spectrumFlashId}
-                onTap={handleSpectrumBandTap}
-              />
-              <p className="mt-2 px-1 text-[10px] leading-relaxed text-white/35">
-                {PRISM_SPECTRUM_LEDE}
-              </p>
-            </div>
-          )}
-
           <div className="wallet-pill-rail mt-5 flex flex-wrap items-stretch justify-center gap-1.5 rounded-[22px] px-2 py-2 sm:gap-2 sm:rounded-full sm:px-3 sm:py-2">
             <button
               type="button"
@@ -806,12 +760,56 @@ export const Prism: React.FC = () => {
           )}
 
           {walletTab === 'assets' && (
-            <div className="mt-6 flex flex-col gap-4">
-              <div className="flex items-end justify-between px-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Your chains</p>
-                <p className="text-[10px] text-white/32">Tap a row</p>
+            <section
+              ref={prismCanvasRef}
+              data-testid="prism-canvas"
+              className="prism-canvas mt-6 flex flex-col items-stretch"
+            >
+              <div className="mb-2 flex items-end justify-between px-0.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Your spectrum</p>
+                <p className="text-[10px] text-white/32">Tap the prism · light beams to each chain</p>
               </div>
-              {chains.map((c, idx) => {
+
+              <button
+                type="button"
+                data-testid="open-command-center"
+                onClick={() => setHubMode('command')}
+                className="group relative z-[3] mx-auto mt-1 flex w-full max-w-[18rem] flex-col items-center rounded-2xl py-1 text-center transition active:scale-[0.99]"
+                aria-label="Open command overview — full-screen identity readout"
+              >
+                <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">PRISM command</p>
+                <div
+                  ref={prismOriginRef}
+                  className="relative rounded-full transition duration-300 group-hover:opacity-95 group-focus-visible:ring-2 group-focus-visible:ring-violet-400/40 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-zinc-950"
+                >
+                  <PrismGlyph
+                    size={156}
+                    isSigning={prismGlyphSigning}
+                    spectrumColors={chains.map((c) => c.color)}
+                    className="pointer-events-none shrink-0 select-none"
+                  />
+                </div>
+                <p className="mt-1.5 max-w-[16rem] text-[10px] leading-snug text-white/28">
+                  Tap the prism for overview — controls stay below
+                </p>
+              </button>
+
+              <p className="mx-auto mt-1 max-w-[22rem] px-2 text-center text-[10.5px] leading-relaxed text-white/38">
+                {PRISM_SPECTRUM_LEDE}
+              </p>
+
+              <div className="relative z-[1] mt-5 flex flex-col gap-4">
+                {chains.length > 0 && (
+                  <PrismBeams
+                    containerRef={prismCanvasRef}
+                    originRef={prismOriginRef}
+                    originYInset={26}
+                    getTargetElement={getChainRowElement}
+                    targets={chains.map((c) => ({ id: c.id, color: c.color }))}
+                    signingId={signingId}
+                  />
+                )}
+                {chains.map((c, idx) => {
                 const isSol = c.id === 'sol';
                 const isSui = c.id === 'sui';
                 const bal = isSol ? solNum : isSui ? suiNum : 0;
@@ -819,10 +817,10 @@ export const Prism: React.FC = () => {
                 const busy = signingId === c.id;
                 const signed = justSigned === c.id;
                 const expanded = expandedId === c.id;
-                const flashing = spectrumFlashId === c.id;
                 return (
                   <div
                     key={c.id}
+                    ref={setChainRowRef(c.id)}
                     data-testid={`facet-row-${c.id}`}
                     style={{
                       animationDelay: `${idx * 0.07}s`,
@@ -832,7 +830,7 @@ export const Prism: React.FC = () => {
                       signed
                         ? 'ring-emerald-400/35 wallet-row-glow wallet-facet-surface'
                         : `wallet-facet-surface ring-white/[0.08] ${isSui ? 'wallet-facet-sui' : ''}`
-                    } ${flashing ? 'chain-row-flash' : ''}`}
+                    }`}
                   >
                     <button
                       type="button"
@@ -896,12 +894,13 @@ export const Prism: React.FC = () => {
                   </div>
                 );
               })}
-              <p className="px-1 pt-2 text-center text-[11px] leading-relaxed text-white/32">
-                Expand a row to copy the address. To <span className="text-white/50">send</span> preview (devnet) coins, use
-                the <span className="text-white/50">Send</span> action in the quick bar (checklist in Phantom / Sui). Flash beam
-                is signing practice, not a transfer.
-              </p>
-            </div>
+                <p className="px-1 pt-2 text-center text-[11px] leading-relaxed text-white/32">
+                  Expand a row to copy the address. To <span className="text-white/50">send</span> preview (devnet) coins, use
+                  the <span className="text-white/50">Send</span> action in the quick bar (checklist in Phantom / Sui). Flash
+                  beam is signing practice, not a transfer.
+                </p>
+              </div>
+            </section>
           )}
 
           {walletTab === 'activity' && (

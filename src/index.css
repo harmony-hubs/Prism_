@@ -930,81 +930,6 @@ body.prism-flash-burst {
   cursor: not-allowed;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   Chain spectrum — horizontal band rail under the prism glyph.
-   Each band carries its chain's color via the `--band-color`
-   custom property (set inline by ChainSpectrum.tsx).
-   ───────────────────────────────────────────────────────────────── */
-.chain-spectrum-bar {
-  background:
-    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.06) 0%, transparent 70%),
-    rgba(255, 255, 255, 0.015);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    0 6px 22px rgba(0, 0, 0, 0.42);
-}
-
-.chain-spectrum-band {
-  isolation: isolate;
-  cursor: pointer;
-}
-
-.chain-spectrum-band:not(:last-child) {
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.chain-spectrum-band__fill {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    var(--band-color, rgba(168, 85, 247, 0.65)) 0%,
-    color-mix(in oklab, var(--band-color, rgba(168, 85, 247, 0.5)) 30%, transparent) 100%
-  );
-  opacity: 0.36;
-  transition:
-    opacity 280ms cubic-bezier(0.23, 1, 0.32, 1),
-    filter 280ms cubic-bezier(0.23, 1, 0.32, 1);
-  pointer-events: none;
-}
-
-.chain-spectrum-band:hover .chain-spectrum-band__fill,
-.chain-spectrum-band:focus-visible .chain-spectrum-band__fill {
-  opacity: 0.7;
-  filter: saturate(1.15);
-}
-
-.chain-spectrum-band--active .chain-spectrum-band__fill {
-  opacity: 0.92;
-  filter: saturate(1.3) brightness(1.1);
-  animation: chain-band-pulse 1.6s ease-in-out infinite;
-}
-
-.chain-spectrum-band--flash {
-  animation: chain-band-flash 1.1s ease-out;
-}
-
-@keyframes chain-band-flash {
-  0% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-  35% {
-    box-shadow: 0 0 22px 3px var(--band-color, rgba(168, 85, 247, 0.65));
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
-
-@keyframes chain-band-pulse {
-  0%, 100% {
-    box-shadow: inset 0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow: inset 0 0 18px 0 var(--band-color, rgba(168, 85, 247, 0.65));
-  }
-}
-
 /* When a chain row knows its own color (--chain-color set inline), the
    left wavelength accent picks that color up instead of the rainbow
    fallback. The rest state is now visible (was hover-only). */
@@ -1047,4 +972,39 @@ body.prism-flash-burst {
       0 0 0 1px rgba(255, 255, 255, 0.06) inset,
       0 0 0 0 transparent;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Prism beams — SVG layer that draws colored rays from the prism
+   glyph's base to each chain row's leading edge. Sits in front of
+   the row stack with `pointer-events: none` so row taps still land.
+   ───────────────────────────────────────────────────────────────── */
+.prism-beams {
+  z-index: 2;
+}
+
+.prism-beam-glow {
+  filter: blur(3px);
+}
+
+.prism-beam-flow {
+  animation: prism-beam-flow 1.6s linear infinite;
+}
+
+@keyframes prism-beam-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* The prism canvas wrapper — gives the SVG layer something to anchor
+   to and keeps row stacking above the beams' soft glow halos. */
+.prism-canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.prism-canvas .chain-row-spectral {
+  position: relative;
+  z-index: 1;
 }
