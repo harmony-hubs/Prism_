@@ -81,21 +81,21 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 ## Architecture (high level)
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                           PRISM                            │
-│  ┌─────────────┐  ┌──────────────────┐  ┌──────────────┐  │
-│  │ Web (Vite)  │  │ PRISM on-chain  │  │ Rust CLI     │  │
-│  │ + Phantom   │  │ Pinocchio +     │  │ (gRPC + RPC)  │  │
-│  │ Learn/Trade  │  │ Ika CPI + gate  │  │ `prism`       │  │
-│  │ Sovereign UI │  │                 │  │              │  │
-│  └──────┬──────┘  └────────┬──────────┘  └──────┬───────┘  │
-│         └──────────────────┴────────────────────┘         │
-│                      Ika dWallet (devnet)                 │
-│         ┌────────────────────────────────────────┐         │
-│   Policy PDA (Encrypt hook) → then approve_message        │
-│   (gated)            │     (ungated approve_action)      │
-│         └────────────────────────────────────────┘         │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                            PRISM                             │
+│                                                              │
+│  ┌──────────────┐    ┌──────────────────┐    ┌─────────────┐ │
+│  │ Web (Vite)   │    │ PRISM on-chain   │    │ Rust CLI    │ │
+│  │ + Phantom    │    │ Pinocchio +      │    │ `prism`     │ │
+│  │ Learn /      │    │ Ika CPI +        │    │ Ika gRPC    │ │
+│  │ Command ctr  │    │ policy + sov.    │    │ DKG, sign   │ │
+│  └──────┬───────┘    └────────┬─────────┘    └──────┬──────┘ │
+│         └─────────────────────┴─────────────────────┘        │
+│                                                              │
+│             Ika dWallet program (Solana devnet)              │
+│        — approve_message → MessageApproval (disc 14)         │
+│        — approve_action_gated → policy PDA gate              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -108,14 +108,16 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 │   └── src/lib.rs
 ├── client/                  # `prism-client` — binary `prism` (Ika gRPC, txs, policy-*)
 │   └── src/
+│       ├── main.rs          # CLI subcommands + ix builders (mirrors program disc)
+│       └── ika_client.rs    # canonical dWallet account parser + PDA seeds (book §accounts)
 ├── voting/                  # `prism-voting` — quorum / voting example (Ika patterns)
 ├── src/                     # PRISM web app (React + Vite)
 │   ├── app.tsx
 │   ├── boot.tsx
 │   ├── main.tsx
 │   ├── PrismLearn.tsx       # dWallet / Ika + Encrypt story + Operator tools
-│   ├── SovereignCommand.tsx
-│   └── dwallet/             # On-chain helpers, Phantom, solanaOnChain, guides
+│   ├── SovereignCommand.tsx # rendered as "Command center" in the UI
+│   └── dwallet/             # solanaOnChain (mirrors ika_client.rs) + canonical memo
 ├── e2e/                     # Playwright (splash → hub → dWallet lab)
 ├── move/                    # Sui — `prism.move` (vision / reference; not required for Solana)
 ├── scripts/                 # e.g. `prism-sign.ps1`, SBF build helpers

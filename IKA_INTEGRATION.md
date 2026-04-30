@@ -33,7 +33,7 @@ This document is the **source of truth** for how this repository talks to **Ika*
 
 - **Role:** “Sovereign” **vision**, Phantom **Solana** connect, read-only or **user-signed Solana** txs, **Learn** (Operator console), portfolio **estimates** where applicable.
 - **Reality:** No **DKG** and no **full `approve_message` submit** in the browser as the main path **today**; the **prism** CLI and Ika gRPC do that.
-- **On-chain program:** Needs **`VITE_PRISM_PROGRAM_ID`** (after deploy) for PDAs, Sovereign UI, and consistent checklist copy in Learn.
+- **On-chain program:** Needs **`VITE_PRISM_PROGRAM_ID`** (after deploy) for PDAs, the Command center UI (`SovereignCommand.tsx`, rendered as **"Command center"**), and consistent checklist copy in Learn.
 
 ### 2. Engine (Rust — `prism` CLI + gRPC)
 
