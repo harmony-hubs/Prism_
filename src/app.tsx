@@ -11,9 +11,11 @@ import {
   PRISM_HOW_STEPS,
   PRISM_INDUSTRY_SHIFT,
   PRISM_PREVIEW_FOOTNOTE,
+  PRISM_SPECTRUM_LEDE,
   PRISM_VISION_LEDE,
   readConnectedPubkey,
 } from './dwallet';
+import { ChainSpectrum } from './ChainSpectrum';
 import { PrismGlyph } from './PrismGlyph';
 import { SovereignCommand } from './SovereignCommand';
 import { SignatureApprovalModal } from './SignatureApprovalModal';
@@ -190,6 +192,32 @@ export const Prism: React.FC = () => {
   const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity }>(null);
   const [confettiOn, setConfettiOn] = useState(false);
   const [beamFlashOn, setBeamFlashOn] = useState(false);
+  const [spectrumFlashId, setSpectrumFlashId] = useState<string | null>(null);
+  const spectrumFlashTimer = useRef<number | null>(null);
+  const handleSpectrumBandTap = useCallback((id: string) => {
+    setSpectrumFlashId(id);
+    if (typeof document !== 'undefined') {
+      const row = document.querySelector(`[data-testid="facet-row-${id}"]`);
+      if (row instanceof HTMLElement) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    if (spectrumFlashTimer.current !== null) {
+      window.clearTimeout(spectrumFlashTimer.current);
+    }
+    spectrumFlashTimer.current = window.setTimeout(() => {
+      setSpectrumFlashId(null);
+      spectrumFlashTimer.current = null;
+    }, 1400);
+  }, []);
+  useEffect(
+    () => () => {
+      if (spectrumFlashTimer.current !== null) {
+        window.clearTimeout(spectrumFlashTimer.current);
+      }
+    },
+    [],
+  );
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -625,11 +653,26 @@ export const Prism: React.FC = () => {
               <PrismGlyph
                 size={148}
                 isSigning={prismGlyphSigning}
+                spectrumColors={chains.map((c) => c.color)}
                 className="pointer-events-none shrink-0 select-none"
               />
             </div>
             <p className="mt-1.5 max-w-[14rem] text-[10px] leading-snug text-white/28">Tap the prism for overview — controls stay below</p>
           </button>
+
+          {chains.length > 0 && (
+            <div data-testid="prism-spectrum-block" className="mt-4 w-full max-w-[22rem] self-center">
+              <ChainSpectrum
+                chains={chains.map((c) => ({ id: c.id, symbol: c.symbol, color: c.color }))}
+                signingId={signingId}
+                flashId={spectrumFlashId}
+                onTap={handleSpectrumBandTap}
+              />
+              <p className="mt-2 px-1 text-[10px] leading-relaxed text-white/35">
+                {PRISM_SPECTRUM_LEDE}
+              </p>
+            </div>
+          )}
 
           <div className="wallet-pill-rail mt-5 flex flex-wrap items-stretch justify-center gap-1.5 rounded-[22px] px-2 py-2 sm:gap-2 sm:rounded-full sm:px-3 sm:py-2">
             <button
@@ -776,16 +819,20 @@ export const Prism: React.FC = () => {
                 const busy = signingId === c.id;
                 const signed = justSigned === c.id;
                 const expanded = expandedId === c.id;
+                const flashing = spectrumFlashId === c.id;
                 return (
                   <div
                     key={c.id}
                     data-testid={`facet-row-${c.id}`}
-                    style={{ animationDelay: `${idx * 0.07}s` }}
+                    style={{
+                      animationDelay: `${idx * 0.07}s`,
+                      ['--chain-color' as string]: c.color,
+                    }}
                     className={`group chain-row-spectral token-row-enter overflow-hidden rounded-[20px] ring-1 transition ${
                       signed
                         ? 'ring-emerald-400/35 wallet-row-glow wallet-facet-surface'
                         : `wallet-facet-surface ring-white/[0.08] ${isSui ? 'wallet-facet-sui' : ''}`
-                    }`}
+                    } ${flashing ? 'chain-row-flash' : ''}`}
                   >
                     <button
                       type="button"

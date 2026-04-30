@@ -345,6 +345,14 @@ export const PRISM_HOW_STEPS = [
 export const PRISM_PREVIEW_FOOTNOTE =
   "This public build uses Solana devnet and value-free assets so anyone can try it safely. Mainnet, full MPC, and the full policy stack follow the Ika and Encrypt roadmaps. Not a bank or brokerage; estimates only.";
 
+/**
+ * Spectrum metaphor lede — rendered above the chain spectrum bar in the
+ * wallet hub. Short on purpose so the bar itself does the talking; ties
+ * the visual back to the canonical "programmable asset authority" framing.
+ */
+export const PRISM_SPECTRUM_LEDE =
+  "A prism doesn't invent the colors — it reveals them. One Solana intent refracts here into native signatures across each chain; tap a band to land on that wallet row.";
+
 /** Plain-language gloss for jargon in the Learn tab and wallet UI. */
 export const PRISM_GLOSSARY = [
   {

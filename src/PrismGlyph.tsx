@@ -4,14 +4,51 @@ interface Props {
   size?: number;
   isSigning?: boolean;
   className?: string;
+  /**
+   * Optional: native colors for the refracted spectrum (one per beam, in
+   * left-to-right band order). When supplied, the glyph's output beams adopt
+   * the live wallet's chain colors so it visually feeds into the chain
+   * spectrum rail directly below it. Falls back to the canonical
+   * red→amber→green→blue→violet rainbow when omitted (e.g. PrismDashboard).
+   */
+  spectrumColors?: string[];
 }
+
+const FALLBACK_SPECTRUM = [
+  'oklch(0.7 0.24 25)',
+  'oklch(0.85 0.16 88)',
+  'oklch(0.7 0.2 150)',
+  'oklch(0.65 0.22 245)',
+  'oklch(0.55 0.25 295)',
+];
 
 /**
  * The PRISM glyph — refracting triangle that takes a white "intent" beam
- * on the left and refracts it into a native-chain spectrum on the right.
+ * from the apex and refracts it into a native-chain spectrum out of the base.
+ *
+ * The refracted output points DOWN so it visually drops into the chain
+ * spectrum bar rendered directly below the glyph in the wallet hub.
+ *
  * Ringed by a slow orbital halo to evoke the MPC quorum.
  */
-export function PrismGlyph({ size = 240, isSigning = false, className = '' }: Props) {
+export function PrismGlyph({
+  size = 240,
+  isSigning = false,
+  className = '',
+  spectrumColors,
+}: Props) {
+  const colors = spectrumColors && spectrumColors.length > 0 ? spectrumColors : FALLBACK_SPECTRUM;
+  const baseY = 150;
+  const exitY = 200;
+  // Triangle base spans x = 40..160. Beams fan from base midpoint (100, 150)
+  // out to a wider spread at the bottom of the SVG, in left-to-right band order.
+  const fanLeft = 14;
+  const fanRight = 200 - fanLeft;
+  const beams = colors.map((c, i) => {
+    const t = colors.length === 1 ? 0.5 : i / (colors.length - 1);
+    return { c, x2: fanLeft + t * (fanRight - fanLeft) };
+  });
+
   return (
     <div
       data-testid="prism-wallet-glyph"
@@ -82,13 +119,14 @@ export function PrismGlyph({ size = 240, isSigning = false, className = '' }: Pr
         {/* Apex highlight */}
         <circle cx="100" cy="40" r="2.4" fill="oklch(0.98 0.05 88)" />
 
-        {/* Incoming "Intent" beam — only during signing */}
+        {/* Incoming "intent" beam — descends from above the apex into the
+            prism. Visible only during signing. */}
         {isSigning && (
           <motion.line
-            x1="0"
-            y1="120"
-            x2="80"
-            y2="120"
+            x1="100"
+            y1="0"
+            x2="100"
+            y2="40"
             stroke="oklch(0.98 0.01 280)"
             strokeWidth={3}
             strokeLinecap="round"
@@ -98,24 +136,21 @@ export function PrismGlyph({ size = 240, isSigning = false, className = '' }: Pr
           />
         )}
 
-        {/* Refracted spectrum out the right */}
-        <g style={{ opacity: isSigning ? 1 : 0.45, transition: 'opacity 600ms' }}>
-          {[
-            { c: 'oklch(0.7 0.24 25)', y: 70 },
-            { c: 'oklch(0.85 0.16 88)', y: 90 },
-            { c: 'oklch(0.7 0.2 150)', y: 110 },
-            { c: 'oklch(0.65 0.22 245)', y: 130 },
-            { c: 'oklch(0.55 0.25 295)', y: 150 },
-          ].map((b, i) => (
+        {/* Refracted spectrum — exits the base of the prism, fans downward.
+            One beam per chain, left-to-right in band order, so it visually
+            pours into the ChainSpectrum rail below. */}
+        <g style={{ opacity: isSigning ? 1 : 0.55, transition: 'opacity 600ms' }}>
+          {beams.map((b, i) => (
             <line
               key={i}
-              x1="120"
-              y1="120"
-              x2="200"
-              y2={b.y}
+              x1="100"
+              y1={baseY}
+              x2={b.x2}
+              y2={exitY}
               stroke={b.c}
-              strokeWidth="1.4"
-              opacity="0.9"
+              strokeWidth={isSigning ? 1.8 : 1.4}
+              strokeLinecap="round"
+              opacity={0.92}
             />
           ))}
         </g>
