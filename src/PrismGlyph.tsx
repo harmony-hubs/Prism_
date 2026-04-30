@@ -137,9 +137,8 @@ export function PrismGlyph({
         )}
 
         {/* Refracted spectrum — exits the base of the prism, fans downward.
-            One beam per chain, left-to-right in band order, so the eye reads
-            "white intent → prism → native colors" before the PrismBeams
-            overlay carries each ray to its chain row. */}
+            One beam per chain, left-to-right in band order. Used as a static
+            silhouette / fallback behind the 3D PrismCore3D scene. */}
         <g style={{ opacity: isSigning ? 1 : 0.55, transition: 'opacity 600ms' }}>
           {beams.map((b, i) => (
             <line

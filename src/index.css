@@ -975,36 +975,73 @@ body.prism-flash-burst {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Prism beams — SVG layer that draws colored rays from the prism
-   glyph's base to each chain row's leading edge. Sits in front of
-   the row stack with `pointer-events: none` so row taps still land.
+   PRISM canvas — section that holds the 3D PrismCore3D scene plus
+   the chain pills rail and the selected chain drawer. New stacking
+   context so the WebGL canvas never bleeds into siblings.
    ───────────────────────────────────────────────────────────────── */
-.prism-beams {
-  z-index: 2;
-}
-
-.prism-beam-glow {
-  filter: blur(3px);
-}
-
-.prism-beam-flow {
-  animation: prism-beam-flow 1.6s linear infinite;
-}
-
-@keyframes prism-beam-flow {
-  to {
-    stroke-dashoffset: -24;
-  }
-}
-
-/* The prism canvas wrapper — gives the SVG layer something to anchor
-   to and keeps row stacking above the beams' soft glow halos. */
 .prism-canvas {
   position: relative;
   isolation: isolate;
 }
 
-.prism-canvas .chain-row-spectral {
-  position: relative;
-  z-index: 1;
+.prism-core-3d {
+  /* The 3D scene gets its own backdrop — a faint radial wash that
+     reinforces the "vessel of light" feeling without competing with
+     the refractive material. */
+  background:
+    radial-gradient(ellipse at center, rgba(168, 85, 247, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 30%, rgba(245, 158, 11, 0.06) 0%, transparent 55%);
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+.prism-core-3d canvas {
+  outline: none;
+}
+
+/* Chain pills — accessible legend / tap target that mirrors the
+   3D chain spirits inside the prism. */
+.chain-pill {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition:
+    background 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms ease;
+}
+
+.chain-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.chain-pill--active {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--chain-color, rgba(168, 85, 247, 0.5)) 22%, transparent),
+      transparent
+    ),
+    rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 0 0 1px var(--chain-color, rgba(168, 85, 247, 0.6)),
+    0 0 18px color-mix(in oklab, var(--chain-color, rgba(168, 85, 247, 0.5)) 35%, transparent);
+}
+
+.chain-pill--signing {
+  animation: chain-pill-vote 1.6s ease-in-out infinite;
+}
+
+@keyframes chain-pill-vote {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 1px var(--chain-color, rgba(168, 85, 247, 0.6)),
+      0 0 12px color-mix(in oklab, var(--chain-color, rgba(168, 85, 247, 0.5)) 25%, transparent);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px var(--chain-color, rgba(168, 85, 247, 0.9)),
+      0 0 24px color-mix(in oklab, var(--chain-color, rgba(168, 85, 247, 0.8)) 60%, transparent);
+  }
 }

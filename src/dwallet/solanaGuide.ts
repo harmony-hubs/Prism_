@@ -351,7 +351,7 @@ export const PRISM_PREVIEW_FOOTNOTE =
  * the visual back to the canonical "programmable asset authority" framing.
  */
 export const PRISM_SPECTRUM_LEDE =
-  "A prism doesn't invent the colors — it reveals them. One Solana intent refracts here into native signatures across each chain; tap a band to land on that wallet row.";
+  "Your assets live inside the prism as constant reflections of light. Tap a colored point to focus a chain — every action is a vote in the Ika quorum, refracting through this same glass.";
 
 /** Plain-language gloss for jargon in the Learn tab and wallet UI. */
 export const PRISM_GLOSSARY = [

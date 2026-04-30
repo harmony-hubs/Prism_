@@ -15,7 +15,7 @@ import {
   PRISM_VISION_LEDE,
   readConnectedPubkey,
 } from './dwallet';
-import { PrismBeams } from './PrismBeams';
+import { PrismCore3D } from './PrismCore3D';
 import { PrismGlyph } from './PrismGlyph';
 import { SovereignCommand } from './SovereignCommand';
 import { SignatureApprovalModal } from './SignatureApprovalModal';
@@ -192,19 +192,6 @@ export const Prism: React.FC = () => {
   const [sigApproval, setSigApproval] = useState<null | { kind: 'chain'; chain: ChainIdentity }>(null);
   const [confettiOn, setConfettiOn] = useState(false);
   const [beamFlashOn, setBeamFlashOn] = useState(false);
-  // Refs that anchor the prism beam layer: the canvas (whole assets section),
-  // the prism's inner wrapper (origin), and one element per chain row.
-  const prismCanvasRef = useRef<HTMLElement | null>(null);
-  const prismOriginRef = useRef<HTMLDivElement | null>(null);
-  const chainRowRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-  const setChainRowRef = useCallback(
-    (id: string) => (el: HTMLDivElement | null) => {
-      if (el) chainRowRefs.current.set(id, el);
-      else chainRowRefs.current.delete(id);
-    },
-    [],
-  );
-  const getChainRowElement = useCallback((id: string) => chainRowRefs.current.get(id) ?? null, []);
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -760,93 +747,134 @@ export const Prism: React.FC = () => {
           )}
 
           {walletTab === 'assets' && (
-            <section
-              ref={prismCanvasRef}
-              data-testid="prism-canvas"
-              className="prism-canvas mt-6 flex flex-col items-stretch"
-            >
+            <section data-testid="prism-canvas" className="prism-canvas mt-6 flex flex-col items-stretch">
               <div className="mb-2 flex items-end justify-between px-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Your spectrum</p>
-                <p className="text-[10px] text-white/32">Tap the prism · light beams to each chain</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Your prism</p>
+                <p className="text-[10px] text-white/32">Tap a color · empty space = command</p>
               </div>
 
-              <button
-                type="button"
-                data-testid="open-command-center"
-                onClick={() => setHubMode('command')}
-                className="group relative z-[3] mx-auto mt-1 flex w-full max-w-[18rem] flex-col items-center rounded-2xl py-1 text-center transition active:scale-[0.99]"
-                aria-label="Open command overview — full-screen identity readout"
-              >
-                <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">PRISM command</p>
-                <div
-                  ref={prismOriginRef}
-                  className="relative rounded-full transition duration-300 group-hover:opacity-95 group-focus-visible:ring-2 group-focus-visible:ring-violet-400/40 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-zinc-950"
-                >
+              {chains.length > 0 ? (
+                <div className="relative mx-auto w-full max-w-[26rem]">
+                  <PrismCore3D
+                    chains={chains.map((c) => ({
+                      id: c.id,
+                      symbol: c.symbol,
+                      emoji: c.emoji,
+                      color: c.color,
+                      balance: c.id === 'sol' ? solNum : c.id === 'sui' ? suiNum : 0,
+                    }))}
+                    signingId={signingId}
+                    selectedId={expandedId}
+                    onSelect={(id) => setExpandedId(id)}
+                    onPrismTap={() => setHubMode('command')}
+                  />
+                  {/* SVG fallback while WebGL warms up — also a no-WebGL graceful state. */}
+                  <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center opacity-30">
+                    <PrismGlyph
+                      size={180}
+                      isSigning={prismGlyphSigning}
+                      spectrumColors={chains.map((c) => c.color)}
+                      className="select-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mx-auto mt-2 flex h-[18rem] w-full max-w-[26rem] items-center justify-center">
                   <PrismGlyph
-                    size={156}
+                    size={180}
                     isSigning={prismGlyphSigning}
-                    spectrumColors={chains.map((c) => c.color)}
-                    className="pointer-events-none shrink-0 select-none"
+                    className="pointer-events-none select-none opacity-70"
                   />
                 </div>
-                <p className="mt-1.5 max-w-[16rem] text-[10px] leading-snug text-white/28">
-                  Tap the prism for overview — controls stay below
-                </p>
-              </button>
+              )}
 
-              <p className="mx-auto mt-1 max-w-[22rem] px-2 text-center text-[10.5px] leading-relaxed text-white/38">
+              <p className="mx-auto mt-2 max-w-[24rem] px-2 text-center text-[10.5px] leading-relaxed text-white/45">
                 {PRISM_SPECTRUM_LEDE}
               </p>
 
+              {/* Chain pills rail — accessible legend & tap target that mirrors the
+                  3D spirits inside the prism. Tap to focus a chain. */}
               {chains.length > 0 && (
-                <PrismBeams
-                  containerRef={prismCanvasRef}
-                  originRef={prismOriginRef}
-                  originYInset={26}
-                  getTargetElement={getChainRowElement}
-                  targets={chains.map((c) => ({ id: c.id, color: c.color }))}
-                  signingId={signingId}
-                />
+                <div
+                  role="group"
+                  aria-label="Chains in the prism"
+                  className="mt-4 flex flex-wrap justify-center gap-2 px-2"
+                >
+                  {chains.map((c) => {
+                    const isSol = c.id === 'sol';
+                    const isSui = c.id === 'sui';
+                    const bal = isSol ? solNum : isSui ? suiNum : 0;
+                    const isActive = expandedId === c.id;
+                    const isSigning = signingId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        data-testid={`chain-pill-${c.id}`}
+                        onClick={() => setExpandedId(isActive ? null : c.id)}
+                        style={{ ['--chain-color' as string]: c.color }}
+                        className={`chain-pill group inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition ${
+                          isActive
+                            ? 'chain-pill--active text-white'
+                            : 'text-white/70 hover:text-white'
+                        } ${isSigning ? 'chain-pill--signing' : ''}`}
+                        aria-pressed={isActive}
+                        aria-label={`${c.name} — ${formatCrypto(bal, 4)} ${c.symbol}${isSigning ? ' (vote in flight)' : ''}`}
+                      >
+                        <span
+                          aria-hidden
+                          className="chain-pill-dot inline-block h-2 w-2 rounded-full"
+                          style={{
+                            backgroundColor: c.color,
+                            boxShadow:
+                              isActive || isSigning ? `0 0 10px ${c.color}` : 'none',
+                          }}
+                        />
+                        <span className="font-semibold tracking-wide">{c.symbol}</span>
+                        <span className="tabular-nums text-white/45">
+                          {formatCrypto(bal, 4)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
 
-              <div className="relative z-[1] mt-5 flex flex-col gap-4">
-                {chains.map((c, idx) => {
+              {/* Selected chain drawer — opens when a spirit (or pill) is tapped. */}
+              {expandedId && (() => {
+                const c = chains.find((x) => x.id === expandedId);
+                if (!c) return null;
                 const isSol = c.id === 'sol';
                 const isSui = c.id === 'sui';
                 const bal = isSol ? solNum : isSui ? suiNum : 0;
                 const usd = isSol ? solNum * SOL_USD_EST : isSui ? suiNum * SUI_USD_EST : 0;
                 const busy = signingId === c.id;
                 const signed = justSigned === c.id;
-                const expanded = expandedId === c.id;
                 return (
                   <div
-                    key={c.id}
-                    ref={setChainRowRef(c.id)}
-                    data-testid={`facet-row-${c.id}`}
-                    style={{
-                      animationDelay: `${idx * 0.07}s`,
-                      ['--chain-color' as string]: c.color,
-                    }}
-                    className={`group chain-row-spectral token-row-enter overflow-hidden rounded-[20px] ring-1 transition ${
-                      signed
-                        ? 'ring-emerald-400/35 wallet-row-glow wallet-facet-surface'
-                        : `wallet-facet-surface ring-white/[0.08] ${isSui ? 'wallet-facet-sui' : ''}`
+                    data-testid={`chain-drawer-${c.id}`}
+                    className={`chain-row-spectral wallet-facet-surface mt-4 overflow-hidden rounded-[20px] ring-1 ${
+                      signed ? 'ring-emerald-400/35 wallet-row-glow' : 'ring-white/[0.08]'
                     }`}
+                    style={{ ['--chain-color' as string]: c.color }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(expanded ? null : c.id)}
-                      className="relative z-[1] flex w-full items-center gap-3.5 px-4 py-4 text-left transition-all duration-300 group-hover:pl-5"
-                    >
+                    <div className="relative z-[1] flex items-center gap-3.5 px-4 py-4">
                       <div
-                        className="wallet-chain-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base sm:h-11 sm:w-11 sm:text-lg"
-                        style={{ backgroundColor: `${c.color}28`, boxShadow: `inset 0 0 0 1px ${c.color}45` }}
+                        className="wallet-chain-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg"
+                        style={{
+                          backgroundColor: `${c.color}28`,
+                          boxShadow: `inset 0 0 0 1px ${c.color}45`,
+                        }}
                       >
                         {c.emoji}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-[15px] tracking-tight text-white/[0.96]">{c.name}</div>
-                        <div className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-white/38">{c.symbol}</div>
+                        <div className="font-semibold text-[15px] tracking-tight text-white/[0.96]">
+                          {c.name}
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-white/38">
+                          {c.symbol}
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="text-[16px] font-semibold tabular-nums tracking-tight text-white/[0.96]">
@@ -854,53 +882,54 @@ export const Prism: React.FC = () => {
                         </div>
                         <div className="text-[11px] text-white/38">{formatUsd(usd)}</div>
                       </div>
-                      <span
-                        className={`shrink-0 text-[11px] font-medium text-white/35 transition ${expanded ? 'rotate-90' : ''}`}
-                        aria-hidden
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(null)}
+                        aria-label="Close chain detail"
+                        className="ml-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/40 transition hover:bg-white/[0.06] hover:text-white/80"
                       >
-                        ›
-                      </span>
-                    </button>
-                    {expanded && (
-                      <div className="relative z-[1] space-y-3 border-t border-white/[0.08] bg-black/20 px-4 py-4">
-                        <p className="wallet-address-box break-all rounded-xl px-3 py-2.5 font-mono text-[11px] leading-relaxed text-white/58">
-                          {c.address}
-                        </p>
-                        <div className="flex gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => copy(c.id, c.address)}
-                            className="flex-1 rounded-xl bg-white/[0.1] py-3 text-[13px] font-semibold text-white/92 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset] transition hover:bg-white/[0.14]"
-                          >
-                            {copied === c.id ? 'Copied' : 'Copy address'}
-                          </button>
-                          <button
-                            type="button"
-                            data-testid={`test-sign-${c.id}`}
-                            disabled={busy || signingId !== null}
-                            onClick={() => setSigApproval({ kind: 'chain', chain: c })}
-                            className="wallet-btn-bounce flash-beam-btn group/flash flex flex-1 items-center justify-center rounded-xl py-3.5"
-                          >
-                            <span className="flash-beam-btn__sheen" aria-hidden />
-                            <span className="relative z-10 text-center text-[12px] font-bold uppercase tracking-tight text-zinc-400 transition-colors group-hover/flash:text-white sm:text-[13px]">
-                              {busy ? '…' : 'Flash practice beam'}
-                            </span>
-                          </button>
-                        </div>
-                        <p className="text-[10px] leading-relaxed text-white/38">
-                          Opens the command signature sheet (2PC-MPC practice) before the beam.
-                        </p>
+                        ✕
+                      </button>
+                    </div>
+                    <div className="relative z-[1] space-y-3 border-t border-white/[0.08] bg-black/20 px-4 py-4">
+                      <p className="wallet-address-box break-all rounded-xl px-3 py-2.5 font-mono text-[11px] leading-relaxed text-white/58">
+                        {c.address}
+                      </p>
+                      <div className="flex gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => copy(c.id, c.address)}
+                          className="flex-1 rounded-xl bg-white/[0.1] py-3 text-[13px] font-semibold text-white/92 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset] transition hover:bg-white/[0.14]"
+                        >
+                          {copied === c.id ? 'Copied' : 'Copy address'}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`test-sign-${c.id}`}
+                          disabled={busy || signingId !== null}
+                          onClick={() => setSigApproval({ kind: 'chain', chain: c })}
+                          className="wallet-btn-bounce flash-beam-btn group/flash flex flex-1 items-center justify-center rounded-xl py-3.5"
+                        >
+                          <span className="flash-beam-btn__sheen" aria-hidden />
+                          <span className="relative z-10 text-center text-[12px] font-bold uppercase tracking-tight text-zinc-400 transition-colors group-hover/flash:text-white sm:text-[13px]">
+                            {busy ? 'Voting…' : 'Cast a vote · flash beam'}
+                          </span>
+                        </button>
                       </div>
-                    )}
+                      <p className="text-[10px] leading-relaxed text-white/38">
+                        Flash beam = a 2PC-MPC quorum vote (signing practice, not a transfer). Watch the prism: outer
+                        particles spiral inward in {c.symbol} color while the vote is in flight.
+                      </p>
+                    </div>
                   </div>
                 );
-              })}
-                <p className="px-1 pt-2 text-center text-[11px] leading-relaxed text-white/32">
-                  Expand a row to copy the address. To <span className="text-white/50">send</span> preview (devnet) coins, use
-                  the <span className="text-white/50">Send</span> action in the quick bar (checklist in Phantom / Sui). Flash
-                  beam is signing practice, not a transfer.
-                </p>
-              </div>
+              })()}
+
+              <p className="mt-3 px-1 text-center text-[11px] leading-relaxed text-white/32">
+                Tap a color in the prism (or a pill below it) to focus a chain. Use{' '}
+                <span className="text-white/50">Send</span> in the quick bar to move preview coins. Every signature is a
+                quorum vote — visible as light moving inside the prism.
+              </p>
             </section>
           )}
 
