@@ -2,25 +2,33 @@
 
 [![CI](https://github.com/harmony-hubs/Prism_/actions/workflows/ci.yml/badge.svg)](https://github.com/harmony-hubs/Prism_/actions/workflows/ci.yml)
 
-**Solana defines asset authority. Native chains keep the asset.**
-
-Public repo: **[github.com/harmony-hubs/Prism_](https://github.com/harmony-hubs/Prism_)** (MIT).
+> **Threshold-signed asset authority.** A **Solana program** decides what's allowed to sign; an **Ika 2PC-MPC** quorum produces a **native signature**; the asset never leaves its home chain. On top of that primitive, PRISM adds **Encrypt-shaped policy gates**, **sovereign-recovery PDAs**, and (next) **paired intents** that settle bridgeless markets on the same gate.
 
 **[Colosseum Frontier 2026](https://colosseum.com/frontier)** — **Encrypt & Ika** track · [Superteam — Bridgeless & encrypted capital markets](https://superteam.fun/earn/listing/encrypt-ika-frontier-april-2026)
 
-PRISM is a **command surface for programmable asset authority**. It pairs a **Solana policy program** with an **operator UI** and uses **Ika dWallets** for native-chain `approve_message` / **MessageApproval** flows, plus **Encrypt**-shaped **policy gating** (on-chain eligibility before that CPI). It is **not** a bridge, a wrapped-asset issuer, or a consumer wallet app — see the canonical memo at the top of [`src/dwallet/solanaGuide.ts`](src/dwallet/solanaGuide.ts) (`DWALLET_AUTHORITY_FRAMING_SEGMENTS`).
+### Status
 
-### At a glance (Ika / reviewers)
+| | |
+|---|---|
+| Stage | Pre-alpha · Solana **devnet** only · not audited |
+| Solana controller | `prism-program` (Pinocchio + [`ika-dwallet-pinocchio`](https://github.com/dwallet-labs/ika-pre-alpha)) — set `VITE_PRISM_PROGRAM_ID` after deploy |
+| CPI authority | `find_program_address(["__ika_cpi_authority"], PRISM_PROGRAM_ID)` (bound after `init_prism`) |
+| Ika dWallet program (devnet) | `87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY` |
+| Engine | `prism` CLI — Rust + gRPC ([`client/`](client/)); needs `protoc` on `PATH` to build |
+| UI | React + Vite + Three.js (R3F) — 3D quorum-vote prism (`src/PrismCore3D.tsx`) |
+| Sui twin | Tracked, not yet shipped |
+| Public repo | [github.com/harmony-hubs/Prism_](https://github.com/harmony-hubs/Prism_) (MIT) |
+| Internal architecture truth | [IKA_INTEGRATION.md](IKA_INTEGRATION.md) — read before adding TS snippets or new flows |
 
-| You want… | Start here |
-|-----------|------------|
-| **Book alignment** | Same high-level path as the [dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/): **create dWallet → CPI authority to your program → `approve_message` → MessageApproval**. See **Ika docs ↔ this repo** below. |
-| **On-chain CPI** | `program/src/lib.rs` — `approve_action` / `approve_action_gated` CPI to the Ika dWallet program; CPI PDA = `find_program_address(["__ika_cpi_authority"], PRISM_PROGRAM_ID)`. |
-| **Off-chain + gRPC** | `client/` — `prism` CLI (`create`, `sign`, `policy-*`, `status`). Needs **`protoc`** on `PATH` to build (see **How to run**). |
-| **Operator UI** | `npm install && npm start` → **Learn** → Operator console (`src/DWalletTools.tsx`) + on-chain helpers in `src/dwallet/`. |
-| **Pre-alpha defaults** | Ika gRPC + devnet dWallet program id are documented in **Pre-alpha environment**; do not use real funds per Ika’s disclaimer. |
+### What PRISM adds over plain dWallet custody
 
-**Internal Ika stack (Solana vs Sui SDK):** see **[IKA_INTEGRATION.md](IKA_INTEGRATION.md)** before adding TS snippets or new flows.
+| Layer | Primitive | Where in this repo |
+|---|---|---|
+| **Custody** (parity with Ika dWallet references — see [Adjacent reference implementations](#adjacent-reference-implementations) below) | `approve_message` CPI → MessageApproval | `program/src/lib.rs::approve_action`; CLI `client/src/main.rs::sign` |
+| **Encrypt policy gate** | `approve_action_gated` only fires when `["prism_policy", owner, message_hash][0] == 1` | `program/src/lib.rs::{init_encrypt_policy_gate, set_encrypt_policy_eligible, approve_action_gated}` |
+| **Sovereign recovery** | `prism_sovereign` PDA — heartbeat / inactivity / panic / recovery state machine | `program/src/lib.rs` (`init_sovereign` / `poke_sovereign` / `spring_inactivity` / `spring_panic`); UI `src/SovereignCommand.tsx` |
+| **Paired intents** *(designed, not yet implemented)* | `place_intent` + `match_intents` flip two paired Encrypt gates **atomically** — cryptographic atomic settlement, no bridge contract anywhere in the path | Builds on `approve_action_gated`; design notes in [IKA_INTEGRATION.md](IKA_INTEGRATION.md) |
+| **Quorum-vote UI** | 3D refractive prism; chains live as colored light reflections inside; every signature renders as quorum particles spiraling through the glass | `src/PrismCore3D.tsx` |
 
 > **Pre-alpha disclaimer (Ika, abridged from the book).** *Pre-alpha only: no real MPC — a single mock signer; interfaces and formats may change; devnet state may be wiped before Ika Alpha 1. Do not use real funds, do not rely on keys or security, software is as-is.* See the [dWallet Developer Guide](https://solana-pre-alpha.ika.xyz/print.html) — search **“Pre-Alpha Disclaimer”** for the full text, and our `PRE_ALPHA_DISCLAIMER_SHORT` constant in `src/dwallet/solanaGuide.ts`.
 
@@ -29,6 +37,24 @@ PRISM is a **command surface for programmable asset authority**. It pairs a **So
 PRISM reproduces the **Ika team's** dWallet positioning memo **verbatim** in [`DWALLET_AUTHORITY_FRAMING_SEGMENTS`](src/dwallet/solanaGuide.ts), with attribution at [`DWALLET_AUTHORITY_FRAMING_ATTRIBUTION`](src/dwallet/solanaGuide.ts) and a byline in **Learn** (`data-testid="dwallet-authority-attribution"`). PRISM **did not author** that text — we render it word-for-word so reviewer-facing copy stays faithful to the primitive's authors. Edit the segments only when the source memo changes; the UI and docs follow.
 
 **Pull quote (one line from that memo):** *Ika lets Solana programs control native asset actions on any chain through programmable, zero-trust signing.*
+
+### Adjacent reference implementations
+
+If you've seen **[ikavery v0.1](https://www.ikavery.com/)** ([@iamknownasfesal](https://github.com/iamknownasfesal)) — the clean two-chain reference for Ika 2PC-MPC custody (a **Sui Move** package and a **Solana `Quasar`** program, each with a published TypeScript SDK) — that is the **custody-layer peer** to PRISM. ikavery answers *"how do you place a key under threshold MPC and recover it?"* PRISM answers *"now that you have that key, what can a Solana program decide is allowed to sign with it?"*
+
+Reviewers familiar with ikavery should expect **parity at the dWallet primitive** (same Ika 2PC-MPC, same `approve_message` → MessageApproval flow on Solana) and find PRISM sitting one layer up. The diff:
+
+| | ikavery | PRISM |
+|---|---|---|
+| Solana controller | `Quasar` program | `prism-program` (Pinocchio) |
+| Sui controller | Sui Move package | not yet (tracked) |
+| TypeScript SDK | `@fesal-packages/ikavery-{sui,solana}-sdk` | embedded in the wallet UI; standalone SDK on the roadmap |
+| Encrypt policy gate | — | `approve_action_gated` + per-message-hash policy PDA |
+| Sovereign / recovery state | "Recovery proposals" (generic) | `prism_sovereign` PDA: heartbeat + inactivity + panic + recovery |
+| Bridgeless-market path | — | paired intents on the same Encrypt gate (in design) |
+| UI | text + lists | 3D refractive prism; signing renders as quorum particles converging through the glass |
+
+ikavery is custody-only and ships it cleanly on two chains; PRISM is **custody + programmable signing authority + sovereign recovery + (next) paired intents**, all on top of the same Ika dWallet primitive. The two projects are complementary, not competing.
 
 ### Ika docs ↔ this repo (60-second cross-walk)
 
@@ -111,10 +137,13 @@ If you use Bitcoin, Ethereum, Solana, and more, your **on-chain identity is frag
 │       ├── main.rs          # CLI subcommands + ix builders (mirrors program disc)
 │       └── ika_client.rs    # canonical dWallet account parser + PDA seeds (book §accounts)
 ├── voting/                  # `prism-voting` — quorum / voting example (Ika patterns)
-├── src/                     # PRISM web app (React + Vite)
+├── src/                     # PRISM web app (React + Vite + Three.js / R3F)
 │   ├── app.tsx
 │   ├── boot.tsx
 │   ├── main.tsx
+│   ├── PrismCore3D.tsx      # 3D refractive prism: chains as inner light, signing = quorum particles
+│   ├── PrismGlyph.tsx       # SVG silhouette / fallback behind the WebGL canvas
+│   ├── Crystal.tsx          # splash-screen R3F crystal (separate scene)
 │   ├── PrismLearn.tsx       # dWallet / Ika + Encrypt story + Operator tools
 │   ├── SovereignCommand.tsx # rendered as "Command center" in the UI
 │   └── dwallet/             # solanaOnChain (mirrors ika_client.rs) + canonical memo

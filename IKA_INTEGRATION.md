@@ -103,6 +103,26 @@ The full positioning memo — **word-for-word** — is **`DWALLET_AUTHORITY_FRAM
 
 ---
 
+## Adjacent reference implementations (where PRISM sits)
+
+PRISM is **not** the only Ika 2PC-MPC reference on Solana, and that is on purpose — the field is small enough that reviewers benefit from being told where each project sits.
+
+| Project | Layer | Where the work lives |
+|---|---|---|
+| **[ikavery v0.1](https://www.ikavery.com/)** ([@iamknownasfesal](https://github.com/iamknownasfesal)) | **Custody layer**: threshold-signed key custody + recovery proposals. Two-chain reference (Sui Move package + Solana `Quasar` program) with a published TypeScript SDK per chain (`@fesal-packages/ikavery-{sui,solana}-sdk`). | Sui: `0x7addf236…afedef`. Solana (devnet): `ikavRY1xV8…1bxFHa`. |
+| **PRISM** (this repo) | **Authority + policy + recovery + (next) intent layer** on top of an Ika dWallet. Solana-first today; Sui twin tracked. | `program/src/lib.rs` (Pinocchio), `client/` (Rust + gRPC), `src/` (React + R3F). |
+
+**How to read the relationship.** ikavery proves the Ika dWallet primitive cleanly — *"place a key under k-of-n MPC and recover it."* PRISM **assumes** that primitive and asks the next question — *"what should be allowed to sign with it, under what condition, and what visualises the vote?"* That is why PRISM ships:
+
+1. **Encrypt policy gate** (`approve_action_gated` + `["prism_policy", owner, message_hash]` PDA) — the cryptographic precondition for atomicity (a signature literally cannot be produced unless the gate byte is `1`).
+2. **`prism_sovereign` PDA** — a typed state machine for heartbeat / inactivity / panic / recovery, not a generic "recovery proposal" object.
+3. **Paired intents (in design)** — `place_intent` + `match_intents` flip two paired Encrypt gates atomically in one Solana transaction; both Ika signatures release together or neither does. This is the "true bridgeless market" path: the only trust root is the Ika quorum (the same one ikavery already proves at the custody layer); no wrapped IOU, no bridge contract, no extra validator set.
+4. **3D quorum-vote UI** (`src/PrismCore3D.tsx`) — votes are not text rows; they are visible particles converging through a refractive prism in the active chain's color.
+
+**Not competing.** If a reviewer wants to vet *just* the Ika 2PC-MPC custody primitive, ikavery is the clean read. If they want to vet what a Solana program plus Encrypt buys you on top of that primitive, this repo is the read. Future cross-references go in this section, not scattered across the codebase.
+
+---
+
 ## Changelog (edit when architecture changes)
 
 | Date | Change |
@@ -113,3 +133,5 @@ The full positioning memo — **word-for-word** — is **`DWALLET_AUTHORITY_FRAM
 | 2026-04-22 | Product framing: verbatim memo in `DWALLET_AUTHORITY_FRAMING_SEGMENTS` + Learn section. |
 | 2026-04-30 | Attribution: memo attributed to Ika team positioning (`DWALLET_AUTHORITY_FRAMING_ATTRIBUTION`) — byline in Learn + this doc. |
 | 2026-04-30 | Book conformance pass: CLI `Inspect` was using stale dWallet account offsets (authority@0, curve@98 u8, pubkey_len@97, pubkey@32). All three layers now share the canonical book layout (disc=2, authority@2, curve@34 u16 LE, pubkey_len@37, pubkey@38) via `client/src/ika_client.rs::parse_ika_dwallet_account` (single source of truth). Added unit tests locking the layout. |
+| 2026-04-30 | Wallet UI rebuilt around the Ika quorum metaphor: `src/PrismCore3D.tsx` (R3F) renders the wallet as a refractive prism — chains are colored light points orbiting inside; signing animates as outer particles spiralling through the prism in the active chain's colour. Replaces the SVG glyph + horizontal spectrum bar + chain rows. |
+| 2026-05-06 | Documented adjacent reference implementations: [ikavery v0.1](https://www.ikavery.com/) sits at the **custody layer** (Sui Move + Solana `Quasar` + TS SDK per chain). PRISM sits one layer up — same Ika dWallet primitive, plus Encrypt policy gate + `prism_sovereign` PDAs + (next) paired-intent atomic settlement. New "Adjacent reference implementations" section in this file and in `README.md`. |
